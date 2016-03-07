@@ -4,12 +4,13 @@ Initialized: Wed Nov 18 09:55:09 MST 2015.
 
 Instructions for Running:
 ```
-./$1.pl -x
+fixitemholdsbot.pl -x
 ```
 
 Product Description:
 --------------------
 Perl script written by Andrew Nisbet for Edmonton Public Library, distributable by the enclosed license.
+Used to audit broken holds, that is holds that point to invalid items that produce item database errors.
 
 Repository Information:
 -----------------------

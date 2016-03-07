@@ -2,10 +2,10 @@
 ####################################################
 #
 # Perl source file for project deleteme 
-# Purpose:
-# Method:
+# Purpose: Fix item database errors.
+# Method:  Symphony API
 #
-# <one line to give the program's name and a brief idea of what it does.>
+# Audit and fix holds that point to invalid items resulting in item database errors.
 #    Copyright (C) 2015  Andrew Nisbet
 #
 # This program is free software; you can redistribute it and/or modify
@@ -59,7 +59,7 @@ my $PIPE               = "$BINCUSTOM/pipe.pl";
 #
 sub usage()
 {
-    print STDERR \<\< "EOF";
+    print STDERR << "EOF";
 
 	usage: $0 [-xt]
 Usage notes for deleteme.pl.
@@ -132,6 +132,29 @@ sub init
 init();
 
 ### code starts
+# Skip selection for testing if a list of broken items already exists. 
+if ( $opt{'t'} and -s "broken.holds.txt" )
+{
+	printf STDERR "Test selected and 'broken.holds.txt' already exists; using that one.\n";
+}
+else # no way around it, got to make another.
+{
+	# This line gets all the active holds in the hold table and give me the error 111 from selitem
+	`selhold -jACTIVE -oI | selitem -iI  2>broken.holds.txt >/dev/null`;
+}
+
+my $results = `cat broken.holds.txt | wc -l`;
+chomp $results;
+$results = `echo "$results" | "$PIPE" -tc0`;
+printf "Found %d errors in hold table.\n", $results;
+# Parse out the item keys. NOTE: you can't trust the item ID matches this item key.
+# **error number 111 on item start, cat=614893 seq=40 copy=2 id=31221105766351
+$results = `cat broken.holds.txt | "$PIPE" -W'=' -oc1,c2,c3 -h' ' | "$PIPE" -W'\\s+' -zc0 -oc0,c2,c4 -P`;
+my $itemIdFile = create_tmp_file( "fixitemdb_", $results );
+# Dedup on the item id.
+$results = `cat "$itemIdFile" | "$PIPE" -d'c0,c1,c2' -P`;
+my $dedupItemIdFile = create_tmp_file( "fixitemdb_", $results );
+# TODO: Using the catalog key(s) find a valid item.
 
 ### code ends
 if ( $opt{'t'} )
