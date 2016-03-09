@@ -28,10 +28,12 @@ Using the cat key, find another viable item on the title.
 Finally with the cat key, sequence number, and copy number for a valid item
 change the hold record to the valid ID.
 
+```
  -c: Just check how many holds are we talking about.
  -t: Preserve temporary files in $TEMP_DIR.
  -U: Do the work, otherwise just print what would do to STDERR.
  -x: This (help) message.
+```
  
 Repository Information:
 -----------------------
