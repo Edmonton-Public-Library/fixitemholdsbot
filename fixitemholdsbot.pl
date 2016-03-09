@@ -26,6 +26,7 @@
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Created: Thu Nov 19 14:26:00 MST 2015
 # Rev: 
+#          0.1 - Production. 
 #          0.0 - Dev. 
 #
 ####################################################
@@ -42,7 +43,7 @@ use Getopt::Std;
 $ENV{'PATH'}  = qq{:/s/sirsi/Unicorn/Bincustom:/s/sirsi/Unicorn/Bin:/usr/bin:/usr/sbin};
 $ENV{'UPATH'} = qq{/s/sirsi/Unicorn/Config/upath};
 ###############################################
-my $VERSION            = qq{0.0};
+my $VERSION            = qq{0.1};
 my $TEMP_DIR           = `getpathname tmp`;
 chomp $TEMP_DIR;
 my $TIME               = `date +%H%M%S`;
@@ -200,7 +201,11 @@ sub get_viable_itemKey( $$$ )
 	my @resultLines = split '\n', $results;
 	foreach my $line ( @resultLines )
 	{
-		( $newCK, $newSN, $newCN ) = split '\|', $line if ( isValidLocation( $line ) );
+		if ( isValidLocation( $line ) )
+		{
+			( $newCK, $newSN, $newCN ) = split '\|', $line;
+			last;
+		}
 	}
 	return ( $newCK, $newSN, $newCN );
 }
@@ -249,7 +254,7 @@ while (<ITEM_KEYS>)
 {
 	my ( $catKey, $seqNumber, $copyNumber ) = split '\|', $_;
 	my ( $viableItemKey, $viableSeqNumber, $viableCopyNumber ) = get_viable_itemKey( $catKey, $seqNumber, $copyNumber );
-	if ( $viableItemKey eq "" )
+	if ( $viableSeqNumber eq "" )
 	{
 		printf STDERR "* warning: no viable items on cat key '%s'.\n", $catKey;
 		next;
@@ -264,8 +269,8 @@ while (<ITEM_KEYS>)
 	if ( $opt{'U'} )
 	{
 		# Now edit the hold to the new sequence number and copy number.
-		`cat "$holdsToFix" | edithold -c"$viableSeqNumber"`;
-		`cat "$holdsToFix" | edithold -d"$viableCopyNumber"`;
+		`cat "$holdsToFix" | edithold -c"$viableSeqNumber"` if ( $viableSeqNumber != $seqNumber );
+		`cat "$holdsToFix" | edithold -d"$viableCopyNumber"` if ( $viableCopyNumber != $copyNumber );
 	}
 	else
 	{
