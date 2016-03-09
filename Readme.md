@@ -42,7 +42,7 @@ This product is under version control using Git.
 
 Dependencies:
 -------------
-[Pipe.pl]{https://github.com/anisbet/pipe}
+[Pipe.pl](https://github.com/anisbet/pipe)
 
 Known Issues:
 -------------
