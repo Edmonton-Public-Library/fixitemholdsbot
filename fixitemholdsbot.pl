@@ -27,6 +27,7 @@
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Created: Thu Nov 19 14:26:00 MST 2015
 # Rev: 
+#          0.1.04 - Added -r, -i for hold key, refactored and tested. 
 #          0.1.02 - Added temp file path to broken holds. 
 #          0.1.01 - Fix hold count error reporting. 
 #          0.1 - Production. 
@@ -54,7 +55,7 @@ use Getopt::Std;
 $ENV{'PATH'}  = qq{:/s/sirsi/Unicorn/Bincustom:/s/sirsi/Unicorn/Bin:/usr/bin:/usr/sbin};
 $ENV{'UPATH'} = qq{/s/sirsi/Unicorn/Config/upath};
 ###############################################
-my $VERSION            = qq{0.1.03_x};
+my $VERSION            = qq{0.1.04};
 chomp( my $TEMP_DIR    = `getpathname tmp` );
 chomp( my $TIME        = `date +%H%M%S` );
 chomp( my $DATE        = `date +%Y%m%d` );
@@ -114,29 +115,35 @@ sub usage()
 {
     print STDERR << "EOF";
 
-	usage: $0 [-citUx]
+	usage: $0 [-a|-i<hold_key>] {rtUx]
 Item database errors occur on accounts when the customer has a hold, who's 
-hold key contains an item key that no longer exists. We are not sure how 
-this happens but suspect that demand management either selects an item 
-that is then removed like a DISCARD, or fails to update items that have 
-been discarded to valid item keys. No matter, fixing the issues requires 
-finding the errant hold and changing it to point to an item in a valid 
-current location. 
+hold key contains an item key that no longer exists. The script has 2
+different modes of operation. If '-a' switch is used, the entire hold table
+is searched for active holds that point to item keys that don't exist with
+the following API.
 
-By default the script finds all the invalid hold item keys with the following.
- selhold -jACTIVE -oI 2>/dev/null | selitem -iI  2>$BROKEN_HOLD_KEYS .
-It then parses out the cat key, call sequence, and copy number.
+ selhold -jACTIVE -oI 2>/dev/null | selitem -iI  2>$BROKEN_HOLD_KEYS 
+ 
+The script collects all the errors and parses the item keys before proceeding
+to fix these items.
 
-First, using selhold, find all the ACTIVE holds that have invalid item keys.
-Next, parse the error 111's and grab the cat key, sequence number, and copy 
-number. You can't rely on the item id in these messages in older versions 
-of Symphony.
-Using the cat key, find another viable item on the title.
-Finally with the cat key, sequence number, and copy number for a valid item
-change the hold record to the valid ID.
+The second mode uses '-i' with a specific hold key. In this case the script
+will find all the holds that are sitting on items that are in problematic 
+current locations. Once a hold on an invalid item has been identified, the
+script will report the best item replacement. If the '-U' switch is used 
+the hold will be updated without the customer losing their place in the queue.
+If no viable item could be found to move the hold to, the TCN and title will
+be reported to STDOUT if '-r' is selected, otherwise the item key is printed
+to STDERR along with a message explaining why the hold could not be moved.
 
- -a: Check entire hold table for holds with issues and report counts.
- -i<hold_key>: Input a specific hold key.
+ -a: Check entire hold table for holds with issues and report counts. The 
+     hold selection is based on ACTIVE holds that point to non-existant 
+	 items. This does not report all holds that point to lost or stolen
+     or discarded items. That would simply take too long.
+ -i<hold_key>: Input a specific hold key. This operation will look at all
+     holds for the title that are placed on items that are currently in 
+     invalid locations like discard, missing, or stolen.
+ -r: Prints TCNs and title of un-fixable holds to STDOUT.
  -t: Preserve temporary files in $TEMP_DIR.
  -U: Do the work, otherwise just print what would do to STDERR.
  -x: This (help) message.
@@ -292,7 +299,7 @@ sub report_or_fix_callseq_copyno( $$$ )
 # return: 
 sub init
 {
-    my $opt_string = 'ai:tUx';
+    my $opt_string = 'ai:rtUx';
     getopts( "$opt_string", \%opt ) or usage();
     usage() if ( $opt{'x'} );
 }
@@ -305,6 +312,7 @@ my $item_keys = '';
 if ( $opt{'a'} )
 {
 	$item_keys = collect_broken_holds();
+	exit( 0 );
 }
 elsif ( $opt{'i'} ) # Check a specific hold key.
 {
@@ -318,7 +326,7 @@ elsif ( $opt{'i'} ) # Check a specific hold key.
 }
 else # Neither required flag was supplied so report.
 {
-	printf STDERR "* warn, missing argument on command line. You must supply a hold key with -i or use -a to test the entire hold table.\n";
+	printf STDERR "* warn, you must supply a hold key with -i or use -a to test the entire hold table.\n";
 	usage();
 }
 if ( ! -s $item_keys )
@@ -361,7 +369,14 @@ while (<ITEM_KEYS>)
 	}
 	else
 	{
-		printf STDERR "* warning: item key '%s' has no viable items.\n", $itemKey;
+		if ( $opt{'r'} )
+		{
+			printf `echo "$itemKey" | selcatalog -iC -oFt 2>/dev/null`;
+		}
+		else
+		{
+			printf STDERR "* warning: item key '%s' has no viable items.\n", $itemKey;
+		}
 	}
 }
 ### code ends
