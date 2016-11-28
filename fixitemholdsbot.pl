@@ -62,6 +62,7 @@ chomp( my $DATE        = `date +%Y%m%d` );
 my @CLEAN_UP_FILE_LIST = (); # List of file names that will be deleted at the end of the script if ! '-t'.
 chomp( my $BINCUSTOM   = `getpathname bincustom` );
 my $BROKEN_HOLD_KEYS   = "$TEMP_DIR/broken.holds.txt";
+my $CHANGED_HOLDS_LOG  = qq{changed_holds.log};
 # These are our invalid locations, your's willl vary. Use getpol to find invalid locations at your site.
 my @INVALID_LOCATIONS  = qw{
 UNKNOWN 
@@ -357,7 +358,7 @@ while (<ITEM_KEYS>)
 			if ( $results )
 			{
 				my $holdsToFix = create_tmp_file( "fixitemholdsbot_$catKey", $results );
-				`cat $holdsToFix >> changed_holds.log`;
+				`cat $holdsToFix >> $CHANGED_HOLDS_LOG`;
 				my $holdKey = `cat $holdsToFix | pipe.pl -oc0 -P`;
 				report_or_fix_callseq_copyno( $holdKey, $viableSeqNumber, $viableCopyNumber );
 			}
