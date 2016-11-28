@@ -54,17 +54,12 @@ use Getopt::Std;
 $ENV{'PATH'}  = qq{:/s/sirsi/Unicorn/Bincustom:/s/sirsi/Unicorn/Bin:/usr/bin:/usr/sbin};
 $ENV{'UPATH'} = qq{/s/sirsi/Unicorn/Config/upath};
 ###############################################
-my $VERSION            = qq{0.1.02};
-my $TEMP_DIR           = `getpathname tmp`;
-chomp $TEMP_DIR;
-my $TIME               = `date +%H%M%S`;
-chomp $TIME;
-my $DATE               = `date +%m/%d/%Y`;
-chomp $DATE;
+my $VERSION            = qq{0.1.03_x};
+chomp( my $TEMP_DIR    = `getpathname tmp` );
+chomp( my $TIME        = `date +%H%M%S` );
+chomp( my $DATE        = `date +%Y%m%d` );
 my @CLEAN_UP_FILE_LIST = (); # List of file names that will be deleted at the end of the script if ! '-t'.
-my $BINCUSTOM          = `getpathname bincustom`;
-chomp $BINCUSTOM;
-my $PIPE               = "$BINCUSTOM/pipe.pl";
+chomp( my $BINCUSTOM   = `getpathname bincustom` );
 my $BROKEN_HOLD_KEYS   = "$TEMP_DIR/broken.holds.txt";
 # These are our invalid locations, your's willl vary. Use getpol to find invalid locations at your site.
 my @INVALID_LOCATIONS  = qw{
@@ -96,7 +91,10 @@ STORAGEHER
 STORAGEREF
 DAMAGE
 BARCGRAVE
+ON-ORDER
+CANC_ORDER
 NON-ORDER
+REF-ORDER
 LOST-ASSUM
 LOST-CLAIM
 PROGRAM
@@ -116,14 +114,18 @@ sub usage()
 {
     print STDERR << "EOF";
 
-	usage: $0 [-ctUx]
+	usage: $0 [-citUx]
 Item database errors occur on accounts when the customer has a hold, who's 
 hold key contains an item key that no longer exists. We are not sure how 
 this happens but suspect that demand management either selects an item 
 that is then removed like a DISCARD, or fails to update items that have 
 been discarded to valid item keys. No matter, fixing the issues requires 
 finding the errant hold and changing it to point to an item in a valid 
-current location.
+current location. 
+
+By default the script finds all the invalid hold item keys with the following.
+ selhold -jACTIVE -oI 2>/dev/null | selitem -iI  2>$BROKEN_HOLD_KEYS .
+It then parses out the cat key, call sequence, and copy number.
 
 First, using selhold, find all the ACTIVE holds that have invalid item keys.
 Next, parse the error 111's and grab the cat key, sequence number, and copy 
@@ -133,7 +135,8 @@ Using the cat key, find another viable item on the title.
 Finally with the cat key, sequence number, and copy number for a valid item
 change the hold record to the valid ID.
 
- -c: Just check how many holds are we talking about.
+ -a: Check entire hold table for holds with issues and report counts.
+ -i<hold_key>: Input a specific hold key.
  -t: Preserve temporary files in $TEMP_DIR.
  -U: Do the work, otherwise just print what would do to STDERR.
  -x: This (help) message.
@@ -179,7 +182,7 @@ sub create_tmp_file( $$ )
 	my $name    = shift;
 	my $results = shift;
 	my $sequence= sprintf "%02d", scalar @CLEAN_UP_FILE_LIST;
-	my $master_file = "$TEMP_DIR/$name.$sequence.$TIME";
+	my $master_file = "$TEMP_DIR/$name.$sequence.$DATE.$TIME";
 	# Return just the file name if there are no results to report.
 	return $master_file if ( ! $results );
 	open FH, ">$master_file" or die "*** error opening '$master_file', $!\n";
@@ -190,32 +193,9 @@ sub create_tmp_file( $$ )
 	return $master_file;
 }
 
-# Tests if an input of item id and location is a valid location according to the
-# list of valid locations in the getpol -tLOCN tool.
-# param:  line like '12345|1|2|CHECKEDOUT|'
-# return: 1 if the location is valid and 0 otherwise.
-sub isValidLocation( $ )
-{
-	# TODO: Finish me.
-	my $catKeyLocation = shift;
-	my @fields = split '\|', $catKeyLocation;
-	if ( defined $fields[3] )
-	{
-		foreach my $location ( @INVALID_LOCATIONS )
-		{
-			return 0 if ( $fields[3] =~ m/($location)/ ); # if the item's location matches one of the forbidden locations return false.
-		}
-	}
-	else
-	{
-		return 0;
-	}
-	return 1;
-}
-
 # Gets a viable item id from all of the item ids on a title. 
-# param:  cat key
-# param:  sequence number
+# param:  cat key of the offending item.
+# param:  sequence number of the offending item.
 # param:  copy number of the offending item.
 # return: triple of new cat key, sequence number, and copy number of a good copy
 #         from the title or an empty triple if none was found.
@@ -223,18 +203,88 @@ sub get_viable_itemKey( $$$ )
 {
 	my ( $ck, $sn, $cn ) = @_;
 	my ( $newCK, $newSN, $newCN ) = "";
+	# The cat key doesn't change - we use the same title - so save it now.
 	$newCK = $ck;
-	my $results = `echo "$ck" | selitem -iC -oIl 2>/dev/null`;
-	my @resultLines = split '\n', $results;
-	foreach my $line ( @resultLines )
+	# Find all the items on the title. This may result in a list of anywhere from 1 - 'n' items.
+	# If the result is 1, we have a problem because it is the original item, which is the one that
+	# was causing the problem in the first place.
+	my $results = `echo "$ck" | selitem -iC -oIm 2>/dev/null`;
+	if ( $results )
 	{
-		if ( isValidLocation( $line ) )
+		my @resultLines = split '\n', $results;
+		foreach my $line ( @resultLines )
 		{
-			( $newCK, $newSN, $newCN ) = split '\|', $line;
-			last;
+			my ( $k, $s, $c, $l ) = split '\|', $line;
+			if ( ! grep( /($l)/, @INVALID_LOCATIONS ) )
+			{
+				( $newCK, $newSN, $newCN ) = split '\|', $line;
+				last;
+			}
 		}
 	}
-	return ( $newCK, $newSN, $newCN );
+	else
+	{
+		printf STDERR "** error, no additional items for cat key %s. Exiting.\n", $newCK;
+	}
+	# Note, these values could be empty if the location is found in the invalid location list.
+	return ( $newCK, $newSN, $newCN ); # The new SN and new CN will be empty.
+}
+
+# Does the initial collection of all the hold keys that have problems. The selection
+# is based on Symphony API: 
+#   selhold -jACTIVE -oI 2>/dev/null | selitem -iI  2>"$BROKEN_HOLD_KEYS" >/dev/null
+# Where we collect all the error 111s and use the information in them. Note that in 
+# older releases of Symphony the item IDs are wrong but the cat key, sequence number
+# and copy number can be used.
+# param:  <none>
+# return: String - name of the file that contains the item keys.
+sub collect_broken_holds()
+{
+	# This line gets all the active holds in the hold table and give me the error 111 from selitem
+	printf STDERR "Collecting hold information. This could take several minutes...\n";
+	`selhold -jACTIVE -oI 2>/dev/null | selitem -iI  2>"$BROKEN_HOLD_KEYS" >/dev/null`;
+	# Sample output.
+	# **error number 111 on item start, cat=744637 seq=116 copy=1 id=31221113136142
+	# This finds the number of broken item keys.
+	chomp( my $results = `cat "$BROKEN_HOLD_KEYS" | pipe.pl -g'c0:error' | wc -l` );
+	$results = `echo "$results" | pipe.pl -tc0`;
+	printf STDERR "Found %d errors in hold table.\n", $results;
+	# We need output to look like: '744637|116|1|'. The next line does this. Note that if you cut and paste this 
+	# line for testing remove the extra backslash in the last pipe.pl command. You need it if you run from a 
+	# script but not from the command line.
+	$results = `cat "$BROKEN_HOLD_KEYS" | pipe.pl -W'=' -oc1,c2,c3 -h' ' | pipe.pl -W'\\s+' -zc0 -oc0,c2,c4 -P`;
+	my $itemIdFile = create_tmp_file( "fixitemholdsbot_a_", $results );
+	return $itemIdFile;
+}
+
+# Makes the changes to the call sequence and copy number.
+# param:  Hold key to change.
+# param:  valid call sequence number.
+# param:  valid copy number.
+# return: <none>
+sub report_or_fix_callseq_copyno( $$$ )
+{
+	chomp( my $holdKey          = shift );
+	chomp( my $viableSeqNumber  = shift );
+	chomp( my $viableCopyNumber = shift );
+	if ( ! $holdKey )
+	{
+		printf STDERR "** Warn: hold key empty.\n";
+		return;
+	}
+	if ( $opt{'U'} )
+	{
+		# Now edit the hold to the new sequence number and copy number.
+		# Note that edithold -c for sequence number and -d for copy number!
+		`echo "$holdKey" | edithold -c"$viableSeqNumber"  2>/dev/null` if ( $viableSeqNumber );
+		`echo "$holdKey" | edithold -d"$viableCopyNumber" 2>/dev/null` if ( $viableCopyNumber );
+	}
+	else # Just print out the results. This is to STDOUT so you can easily pipe to a script.
+	{
+		# Note that edithold -c for sequence number and -d for copy number!
+		printf "echo \"%s\" | edithold -c\"%s\"\n", $holdKey, $viableSeqNumber;
+		printf "echo \"%s\" | edithold -d\"%s\"\n", $holdKey, $viableCopyNumber;
+	}
 }
 
 # Kicks off the setting of various switches.
@@ -242,7 +292,7 @@ sub get_viable_itemKey( $$$ )
 # return: 
 sub init
 {
-    my $opt_string = 'ctUx';
+    my $opt_string = 'ai:tUx';
     getopts( "$opt_string", \%opt ) or usage();
     usage() if ( $opt{'x'} );
 }
@@ -250,69 +300,70 @@ sub init
 init();
 
 ### code starts
-# Skip selection for testing if a list of broken items already exists. 
-if ( $opt{'t'} and -s "$BROKEN_HOLD_KEYS" )
+my $item_keys = '';
+# Check the entire hold table.
+if ( $opt{'a'} )
 {
-	printf "Test selected and '$BROKEN_HOLD_KEYS' already exists; using that one.\n";
+	$item_keys = collect_broken_holds();
 }
-else # no way around it, got to make another.
+elsif ( $opt{'i'} ) # Check a specific hold key.
 {
-	# This line gets all the active holds in the hold table and give me the error 111 from selitem
-	printf STDERR "Collecting hold information. This could take several minutes...\n";
-	`selhold -jACTIVE -oI 2>/dev/null | selitem -iI  2>"$BROKEN_HOLD_KEYS" >/dev/null`;
+	my $results = `echo "$opt{'i'}" | selhold -iK -oI 2>/dev/null`;
+	if ( ! $results )
+	{
+		printf STDERR "** error invalid hold key '%s'.\n", $opt{'i'};
+		exit( 0 );
+	}
+	$item_keys = create_tmp_file( "fixitemholdsbot_sel_opti", $results );
 }
-
-my $results = `cat "$BROKEN_HOLD_KEYS" | "$PIPE" -g'c0:error' | wc -l`;
-chomp $results;
-$results = `echo "$results" | "$PIPE" -tc0`;
-printf "Found %d errors in hold table.\n", $results;
-# If -c then time to exit. we are only interested in how many there are.
-exit 0 if ( $opt{'c'} or $results == 0 );
-# Parse out the item keys. NOTE: you can't trust the item ID matches this item key.
-# **error number 111 on item start, cat=614893 seq=40 copy=2 id=31221105766351
-$results = `cat "$BROKEN_HOLD_KEYS" | "$PIPE" -W'=' -oc1,c2,c3 -h' ' | "$PIPE" -W'\\s+' -zc0 -oc0,c2,c4 -P`;
-my $itemIdFile = create_tmp_file( "fixitemdb_", $results );
-# Dedup on the item id.
-$results = `cat "$itemIdFile" | "$PIPE" -d'c0,c1,c2' -P`;
-my $dedupItemIdFile = create_tmp_file( "fixitemdb_", $results );
+else # Neither required flag was supplied so report.
+{
+	printf STDERR "* warn, missing argument on command line. You must supply a hold key with -i or use -a to test the entire hold table.\n";
+	usage();
+}
+if ( ! -s $item_keys )
+{
+	printf STDERR "No items to process.\n";
+	exit( 0 );
+}
 # Open the $dedupItemIdFile file and use the cat key to get all the item keys.
 # We will use the locations to determine viable copies and then choose the 
 # sequence number and copy number (if necessary) from a viable item with a reasonable location.
-open ITEM_KEYS, "<$dedupItemIdFile" || die "** error opening '$dedupItemIdFile', $!.\n";
+open ITEM_KEYS, "<$item_keys" || die "** error opening '$item_keys', $!.\n";
 while (<ITEM_KEYS>)
 {
-	my ( $catKey, $seqNumber, $copyNumber ) = split '\|', $_;
+	chomp( my ( $catKey, $seqNumber, $copyNumber ) = split '\|', $_ );
+	chomp( my $itemKey = $_ );
 	my ( $viableItemKey, $viableSeqNumber, $viableCopyNumber ) = get_viable_itemKey( $catKey, $seqNumber, $copyNumber );
-	if ( $viableSeqNumber eq "" )
+	# So long as the viable seq #, and viable copy are not the same as the old ones and not empty then proceed.
+	# We don't want to make changes unnecessarily 
+	if ( $viableSeqNumber && $viableCopyNumber )
 	{
-		printf "* warning: no viable items on cat key '%s'.\n", $catKey;
-		next;
-	}
-	# Now replace the old sequence with the new, and if required also the copy number.
-	printf "item key '%s|%s|%s|'.\n", $viableItemKey, $viableSeqNumber, $viableCopyNumber;
-	# Get a list of all the effected item ids for this title by sequence and copy number.
-	$results = `echo "$catKey" | selhold -iC -c"$seqNumber" -d"$copyNumber" -oKIja 2>/dev/null`;
-	# 21683010|1216974|4|3|ACTIVE|N|
-	my $holdsToFix = create_tmp_file( "fixitemdb_$catKey", $results );
-	if ( $opt{'U'} )
-	{
-		# Now edit the hold to the new sequence number and copy number.
-		`cat "$holdsToFix" | edithold -c"$viableSeqNumber" 2>/dev/null` if ( $viableSeqNumber != $seqNumber );
-		`cat "$holdsToFix" | edithold -d"$viableCopyNumber" 2>/dev/null` if ( $viableCopyNumber != $copyNumber );
+		if ( ( $viableSeqNumber != $seqNumber || $viableCopyNumber != $copyNumber ) )
+		{
+			# Now replace the old sequence with the new, and if required also the copy number.
+			printf "item key '$itemKey' should be changed to '%s|%s|%s|'.\n", $viableItemKey, $viableSeqNumber, $viableCopyNumber;
+			# Get the hold key.
+			my $results = `echo "$catKey" | selhold -iC -c"$seqNumber" -d"$copyNumber" -oKIja 2>/dev/null`;
+			# 21683010|1216974|4|3|ACTIVE|N|
+			if ( $results )
+			{
+				my $holdsToFix = create_tmp_file( "fixitemholdsbot_$catKey", $results );
+				`cat $holdsToFix >> changed_holds.log`;
+				my $holdKey = `cat $holdsToFix | pipe.pl -oc0 -P`;
+				report_or_fix_callseq_copyno( $holdKey, $viableSeqNumber, $viableCopyNumber );
+			}
+		}
+		else
+		{
+			printf STDERR "no change for item '%s', hold is on a valid item.\n", $itemKey;
+		}
 	}
 	else
 	{
-		printf "cat \"%s\" | edithold -c\"%s\"\n", $holdsToFix, $viableSeqNumber;
-		printf "cat \"%s\" | edithold -d\"%s\"\n", $holdsToFix, $viableCopyNumber;
+		printf STDERR "* warning: item key '%s' has no viable items.\n", $itemKey;
 	}
 }
 ### code ends
-if ( $opt{'t'} )
-{
-	printf STDERR "Temp files will not be deleted. Please clean up '%s' when done.\n", $TEMP_DIR;
-}
-else
-{
-	clean_up();
-}
+clean_up();
 # EOF

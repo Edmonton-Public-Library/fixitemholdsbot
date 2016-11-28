@@ -33,12 +33,12 @@ LOCAL=~/projects/fixitemholdsbot/
 APP=fixitemholdsbot.pl
 ARGS=-x
 .PHONY: put test production
+
 production: test
 	scp ${LOCAL}${APP} ${USER}@${PRODUCTION_SERVER}:${REMOTE}
-put: test
-	scp ${LOCAL}${APP} ${USER}@${TEST_SERVER}:${REMOTE}
-	ssh ${USER}@${TEST_SERVER} '${REMOTE}${APP} ${ARGS}'
+
 test:
 	perl -c ${APP}
-
+	scp ${LOCAL}${APP} ${USER}@${TEST_SERVER}:${REMOTE}
+	ssh ${USER}@${TEST_SERVER} '${REMOTE}${APP} ${ARGS}'
 
