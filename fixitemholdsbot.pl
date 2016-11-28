@@ -137,6 +137,12 @@ If no viable item could be found to move the hold to, the TCN and title will
 be reported to STDOUT if '-r' is selected, otherwise the item key is printed
 to STDERR along with a message explaining why the hold could not be moved.
 
+Any holds that are moved are added to the $CHANGED_HOLDS_LOG file with the
+following details
+ HoldKey |CatKey |Seq|Copy|HoldStatus|Available|
+Example:
+ 26679727|1805778|2|1|ACTIVE|N|
+
  -a: Check entire hold table for holds with issues and report counts. The 
      hold selection is based on ACTIVE holds that point to non-existant 
 	 items. This does not report all holds that point to lost or stolen
@@ -150,7 +156,10 @@ to STDERR along with a message explaining why the hold could not be moved.
  -x: This (help) message.
 
 example:
-  $0 -x
+  $0 -i26679728 -trU
+  $0 -i26679728 -tr
+  $0 -a
+  $0 -aUr
 Version: $VERSION
 EOF
     exit;
