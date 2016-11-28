@@ -265,7 +265,7 @@ sub collect_broken_holds()
 	# This finds the number of broken item keys.
 	chomp( my $results = `cat "$BROKEN_HOLD_KEYS" | pipe.pl -g'c0:error' | wc -l` );
 	$results = `echo "$results" | pipe.pl -tc0`;
-	printf STDERR "Found %d errors in hold table.\n", $results;
+	printf STDERR "Found %d holds for invalid items in hold table.\n", $results;
 	# We need output to look like: '744637|116|1|'. The next line does this. Note that if you cut and paste this 
 	# line for testing remove the extra backslash in the last pipe.pl command. You need it if you run from a 
 	# script but not from the command line.
