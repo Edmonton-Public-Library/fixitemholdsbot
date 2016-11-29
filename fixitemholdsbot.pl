@@ -139,7 +139,7 @@ to STDERR along with a message explaining why the hold could not be moved.
 
 Any holds that are moved are added to the $CHANGED_HOLDS_LOG file with the
 following details
- HoldKey |CatKey |Seq|Copy|HoldStatus|Available|
+ HoldKey |CatKey |OriginalSeq|OriginalCopy|HoldStatus|Availability|
 Example:
  26679727|1805778|2|1|ACTIVE|N|
 
