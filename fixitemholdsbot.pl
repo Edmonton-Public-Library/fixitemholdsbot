@@ -27,7 +27,7 @@
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Created: Thu Nov 19 14:26:00 MST 2015
 # Rev: 
-#          0.2.01 - -v verbose output. 
+#          0.2.02 - -v verbose output. 
 #          0.2.00 - -u for user id. 
 #          0.1.04 - Added -r, -i for hold key, refactored and tested. 
 #          0.1.02 - Added temp file path to broken holds. 
@@ -57,7 +57,7 @@ use Getopt::Std;
 $ENV{'PATH'}  = qq{:/s/sirsi/Unicorn/Bincustom:/s/sirsi/Unicorn/Bin:/usr/bin:/usr/sbin};
 $ENV{'UPATH'} = qq{/s/sirsi/Unicorn/Config/upath};
 ###############################################
-my $VERSION            = qq{0.2.01};
+my $VERSION            = qq{0.2.02};
 chomp( my $TEMP_DIR    = `getpathname tmp` );
 chomp( my $TIME        = `date +%H%M%S` );
 chomp( my $DATE        = `date +%Y%m%d` );
@@ -401,7 +401,6 @@ while (<ITEM_KEYS>)
 		if ( ( $viableSeqNumber != $seqNumber || $viableCopyNumber != $copyNumber ) )
 		{
 			# Now replace the old sequence with the new, and if required also the copy number.
-			printf "item key '$itemKey' should be changed to '%s|%s|%s|%s|'.\n", $viableItemKey, $viableSeqNumber, $viableCopyNumber, $viableLocation;
 			# Get the hold key.
 			my $results = `echo "$catKey" | selhold -iC -c"$seqNumber" -d"$copyNumber" -oKIja 2>/dev/null`;
 			# 21683010|1216974|4|3|ACTIVE|N|
@@ -410,7 +409,13 @@ while (<ITEM_KEYS>)
 				my $holdsToFix = create_tmp_file( "fixitemholdsbot_$catKey", $results );
 				`cat $holdsToFix >> $CHANGED_HOLDS_LOG`;
 				my $holdKey = `cat $holdsToFix | pipe.pl -oc0 -P`;
+				printf STDERR "Hold key: %s, item key '%s' should be changed to '%s|%s|%s|%s|'.\n", $holdKey, $itemKey, $viableItemKey, $viableSeqNumber, $viableCopyNumber, $viableLocation;
 				report_or_fix_callseq_copyno( $holdKey, $viableSeqNumber, $viableCopyNumber );
+			}
+			else # Couldn't find the hold key with explicit use of cat key sequence number and copy number - there's a big problem.
+			{
+				printf STDERR "*** Panic: no hold found for item key '%s'!\n", $itemKey;
+				exit( 0 );
 			}
 		}
 		else
