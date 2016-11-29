@@ -408,7 +408,7 @@ while (<ITEM_KEYS>)
 			{
 				my $holdsToFix = create_tmp_file( "fixitemholdsbot_$catKey", $results );
 				`cat $holdsToFix >> $CHANGED_HOLDS_LOG`;
-				my $holdKey = `cat $holdsToFix | pipe.pl -oc0 -P`;
+				chomp( my $holdKey = `cat $holdsToFix | pipe.pl -oc0 -P` );
 				printf STDERR "Hold key: %s, item key '%s' should be changed to '%s|%s|%s|%s|'.\n", $holdKey, $itemKey, $viableItemKey, $viableSeqNumber, $viableCopyNumber, $viableLocation;
 				report_or_fix_callseq_copyno( $holdKey, $viableSeqNumber, $viableCopyNumber );
 			}
