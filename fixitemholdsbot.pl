@@ -27,6 +27,7 @@
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Created: Thu Nov 19 14:26:00 MST 2015
 # Rev: 
+#          0.3.00 - -i Shuffle holds by item key. 
 #          0.2.02 - -v verbose output. 
 #          0.2.00 - -u for user id. 
 #          0.1.04 - Added -r, -i for hold key, refactored and tested. 
@@ -57,7 +58,7 @@ use Getopt::Std;
 $ENV{'PATH'}  = qq{:/s/sirsi/Unicorn/Bincustom:/s/sirsi/Unicorn/Bin:/usr/bin:/usr/sbin};
 $ENV{'UPATH'} = qq{/s/sirsi/Unicorn/Config/upath};
 ###############################################
-my $VERSION            = qq{0.2.02};
+my $VERSION            = qq{0.3.00};
 chomp( my $TEMP_DIR    = `getpathname tmp` );
 chomp( my $TIME        = `date +%H%M%S` );
 chomp( my $DATE        = `date +%Y%m%d` );
@@ -72,7 +73,6 @@ REFERENCE
 MISSING
 LOST
 BINDERY
-INPROCESS
 DISCARD
 ILL
 RESERVES
@@ -118,9 +118,9 @@ sub usage()
 {
     print STDERR << "EOF";
 
-	usage: $0 [-a|-h<hold_key>|-B<user_id>] {rtUvx]
+	usage: $0 [-a|-h<hold_key>|-i<item_id_file>|-B<user_id>] {rtUvx]
 Item database errors occur on accounts when the customer has a hold, who's 
-hold key contains an item key that no longer exists. The script has 2
+hold key contains an item key that no longer exists. The script has
 different modes of operation. If '-a' switch is used, the entire hold table
 is searched for active holds that point to item keys that don't exist with
 the following API.
@@ -130,14 +130,27 @@ the following API.
 The script collects all the errors and parses the item keys before proceeding
 to fix these items.
 
-The second mode uses '-h' with a specific hold key. In this case the script
+Another mode uses '-h' with a specific hold key. In this case the script
 will find all the holds that are sitting on items that are in problematic 
 current locations. Once a hold on an invalid item has been identified, the
-script will report the best item replacement. If the '-U' switch is used 
-the hold will be updated without the customer losing their place in the queue.
-If no viable item could be found to move the hold to, the TCN and title will
-be reported to STDOUT if '-r' is selected, otherwise the item key is printed
-to STDERR along with a message explaining why the hold could not be moved.
+script will report the best item replacement. 
+
+A third mode allows the input of an item key file ('-i'), and will move holds from
+a specific item to another viable item on the same title. This may not be possible
+if there is only one item on the title, or all the other items are in non-existant
+viable locations. See '-r' for more information.
+
+Finally the '-B' switch will analyse the holds for a specific use and move the
+holds that currently rest on non-viable items if possible. This may not be 
+possible if the hold is on a title with only one item, or all the items on 
+the title are non-viable (current locations are included in the list of 
+non-viable locations).
+
+If the '-U' switch is used the hold will be updated without the customer
+losing their place in the queue. If no viable item could be found to move 
+the hold to, the TCN and title will be reported to STDOUT if '-r' is selected, 
+otherwise the item key is printed to STDERR along with a message explaining 
+why the hold could not be moved.
 
 Any holds that are moved are added to the $CHANGED_HOLDS_LOG file with the
 following details
@@ -153,6 +166,13 @@ Example:
  -h<hold_key>: Input a specific hold key. This operation will look at all
      holds for the title that are placed on items that are currently in 
      invalid locations like discard, missing, or stolen.
+ -i<item_id_file>: Moves a hold from a specific item (like ON-ORDER) to another
+     viable item. This may not be possible if the only other items are in
+     non-viable locations or there is only one item on the title. Item keys
+     should appear as the first non-white space data on each line, in pipe-
+     delimited format. New lines are Unix style line endings. Example: 
+     '12345|6|7|'
+	 '12345|66|7|ocn2442309|Treasure Island|'
  -r: Prints TCNs and title of un-fixable holds to STDOUT.
  -t: Preserve temporary files in $TEMP_DIR.
  -U: Do the work, otherwise just print what would do to STDERR.
@@ -165,6 +185,7 @@ example:
   $0 -a
   $0 -aUr
   $0 -B21221012345678 -vU
+  $0 -i"item.keys.lst" -vrU
 Version: $VERSION
 EOF
     exit;
@@ -317,7 +338,7 @@ sub report_or_fix_callseq_copyno( $$$ )
 # return: 
 sub init
 {
-    my $opt_string = 'aB:h:rtUvx';
+    my $opt_string = 'aB:h:i:rtUvx';
     getopts( "$opt_string", \%opt ) or usage();
     usage() if ( $opt{'x'} );
 }
@@ -344,7 +365,7 @@ elsif ( $opt{'h'} ) # Check a specific hold key.
 		printf STDERR "** error invalid hold key '%s'.\n", $opt{'h'};
 		exit( 0 );
 	}
-	$item_keys = create_tmp_file( "fixitemholdsbot_sel_opti_", $results );
+	$item_keys = create_tmp_file( "fixitemholdsbot_sel_opth_", $results );
 }
 elsif ( $opt{'B'} )
 {
@@ -375,9 +396,25 @@ elsif ( $opt{'B'} )
 		exit( 0 );
 	}
 }
+elsif ( $opt{'i'} ) # Check a specific hold key.
+{
+	# Check the user supplied a real non-empty file.
+	if ( ! -s $opt{'i'} )
+	{
+		printf STDERR "** error invalid item key file '%s'.\n", $opt{'i'};
+		exit( 0 );
+	}
+	my $results = `cat "$opt{'i'}" | selitem -iI 2>/dev/null`;
+	if ( ! $results )
+	{
+		printf STDERR "* Warn: no valid item IDs in '%s'.\n", $opt{'i'};
+		exit( 0 );
+	}
+	$item_keys = create_tmp_file( "fixitemholdsbot_sel_opti_", $results );
+}
 else # Neither required flag was supplied so report.
 {
-	printf STDERR "* warn, you must supply a hold key with -i, -B, or use -a to test the entire hold table.\n";
+	printf STDERR "* warn, missing one of the required flags: -i, -B, -a, or -h. See below for more information.\n";
 	usage();
 }
 if ( ! -s $item_keys )
