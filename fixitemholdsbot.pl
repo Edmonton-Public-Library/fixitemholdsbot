@@ -27,6 +27,7 @@
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Created: Thu Nov 19 14:26:00 MST 2015
 # Rev: 
+#          0.4.00 - -I Take an item ID as an argument. 
 #          0.3.00 - -i Shuffle holds by item key. 
 #          0.2.02 - -v verbose output. 
 #          0.2.00 - -u for user id. 
@@ -58,7 +59,7 @@ use Getopt::Std;
 $ENV{'PATH'}  = qq{:/s/sirsi/Unicorn/Bincustom:/s/sirsi/Unicorn/Bin:/usr/bin:/usr/sbin};
 $ENV{'UPATH'} = qq{/s/sirsi/Unicorn/Config/upath};
 ###############################################
-my $VERSION            = qq{0.3.00};
+my $VERSION            = qq{0.4.00};
 chomp( my $TEMP_DIR    = `getpathname tmp` );
 chomp( my $TIME        = `date +%H%M%S` );
 chomp( my $DATE        = `date +%Y%m%d` );
@@ -118,7 +119,7 @@ sub usage()
 {
     print STDERR << "EOF";
 
-	usage: $0 [-a|-h<hold_key>|-i<item_id_file>|-B<user_id>] {rtUvx]
+	usage: $0 [-a|-B<user_id>|-h<hold_key>|-i<item_id_file>|-I<item_id>] {rtUvx]
 Item database errors occur on accounts when the customer has a hold, who's 
 hold key contains an item key that no longer exists. The script has
 different modes of operation. If '-a' switch is used, the entire hold table
@@ -139,6 +140,9 @@ A third mode allows the input of an item key file ('-i'), and will move holds fr
 a specific item to another viable item on the same title. This may not be possible
 if there is only one item on the title, or all the other items are in non-existant
 viable locations. See '-r' for more information.
+
+Another common request is to fix holds on an item based on the item id. This
+can be done with the '-I' flag.
 
 Finally the '-B' switch will analyse the holds for a specific use and move the
 holds that currently rest on non-viable items if possible. This may not be 
@@ -173,6 +177,8 @@ Example:
      delimited format. New lines are Unix style line endings. Example: 
      '12345|6|7|'
 	 '12345|66|7|ocn2442309|Treasure Island|'
+ -I<item_id>: Moves holds from a specific item based on it's item ID if
+     required, and if possible.
  -r: Prints TCNs and title of un-fixable holds to STDOUT.
  -t: Preserve temporary files in $TEMP_DIR.
  -U: Do the work, otherwise just print what would do to STDERR.
@@ -186,6 +192,7 @@ example:
   $0 -aUr
   $0 -B21221012345678 -vU
   $0 -i"item.keys.lst" -vrU
+  $0 -I31221116214003 -vrUt
 Version: $VERSION
 EOF
     exit;
@@ -338,7 +345,7 @@ sub report_or_fix_callseq_copyno( $$$ )
 # return: 
 sub init
 {
-    my $opt_string = 'aB:h:i:rtUvx';
+    my $opt_string = 'aB:h:i:I:rtUvx';
     getopts( "$opt_string", \%opt ) or usage();
     usage() if ( $opt{'x'} );
 }
@@ -411,6 +418,16 @@ elsif ( $opt{'i'} ) # Check a specific hold key.
 		exit( 0 );
 	}
 	$item_keys = create_tmp_file( "fixitemholdsbot_sel_opti_", $results );
+}
+elsif ( $opt{'I'} ) # Check a specific item ID.
+{
+	my $results = `echo "$opt{'I'}" | selitem -iB -oI 2>/dev/null`;
+	if ( ! $results )
+	{
+		printf STDERR "** error invalid item bar code '%s'.\n", $opt{'I'};
+		exit( 0 );
+	}
+	$item_keys = create_tmp_file( "fixitemholdsbot_sel_optI_", $results );
 }
 else # Neither required flag was supplied so report.
 {
