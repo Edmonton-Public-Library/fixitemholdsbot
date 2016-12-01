@@ -165,7 +165,7 @@ Example:
 
  -a: Check entire hold table for holds with issues and report counts. The 
      hold selection is based on ACTIVE holds that point to non-existant 
-	 items. This does not report all holds that point to lost or stolen
+     items. This does not report all holds that point to lost or stolen
      or discarded items. That would simply take too long.
  -B<user_id>: Input a specific user id, analyse.
  -h<hold_key>: Input a specific hold key. This operation will look at all
@@ -177,7 +177,7 @@ Example:
      should appear as the first non-white space data on each line, in pipe-
      delimited format. New lines are Unix style line endings. Example: 
      '12345|6|7|'
-	 '12345|66|7|ocn2442309|Treasure Island|'
+     '12345|66|7|ocn2442309|Treasure Island|'
  -I<item_id>: Moves holds from a specific item based on it's item ID if
      required, and if possible.
  -r: Prints TCNs and title of un-fixable holds to STDOUT.
