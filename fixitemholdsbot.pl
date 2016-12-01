@@ -27,6 +27,7 @@
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Created: Thu Nov 19 14:26:00 MST 2015
 # Rev: 
+#          0.4.01_a - Updated usage. 
 #          0.4.01 - Handle multiple hold keys that refer to an non-viable item. 
 #          0.4.00 - -I Take an item ID as an argument. 
 #          0.3.00 - -i Shuffle holds by item key. 
@@ -60,7 +61,7 @@ use Getopt::Std;
 $ENV{'PATH'}  = qq{:/s/sirsi/Unicorn/Bincustom:/s/sirsi/Unicorn/Bin:/usr/bin:/usr/sbin};
 $ENV{'UPATH'} = qq{/s/sirsi/Unicorn/Config/upath};
 ###############################################
-my $VERSION            = qq{0.4.01};
+my $VERSION            = qq{0.4.01_a};
 chomp( my $TEMP_DIR    = `getpathname tmp` );
 chomp( my $TIME        = `date +%H%M%S` );
 chomp( my $DATE        = `date +%Y%m%d` );
@@ -178,7 +179,7 @@ Example:
      delimited format. New lines are Unix style line endings. Example: 
      '12345|6|7|'
      '12345|66|7|ocn2442309|Treasure Island|'
- -I<item_id>: Moves holds from a specific item based on it's item ID if
+ -I<item_barcode>: Moves holds from a specific item based on it's item ID if
      required, and if possible.
  -r: Prints TCNs and title of un-fixable holds to STDOUT.
  -t: Preserve temporary files in $TEMP_DIR.
