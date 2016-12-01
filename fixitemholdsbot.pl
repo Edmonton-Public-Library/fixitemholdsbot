@@ -462,14 +462,17 @@ while (<ITEM_KEYS>)
 			{
 				my $holdsToFix = create_tmp_file( "fixitemholdsbot_$catKey", $results );
 				`cat $holdsToFix >> $CHANGED_HOLDS_LOG`;
-				chomp( my $holdKey = `cat $holdsToFix | pipe.pl -oc0 -P` );
-				printf STDERR "Hold key: %s, item key '%s' should be changed to '%s|%s|%s|%s|'.\n", $holdKey, $itemKey, $viableItemKey, $viableSeqNumber, $viableCopyNumber, $viableLocation;
-				report_or_fix_callseq_copyno( $holdKey, $viableSeqNumber, $viableCopyNumber );
+				chomp( my $holdKeyLines = `cat $holdsToFix | pipe.pl -oc0 -P` );
+				my @holdKeys = split '\n', $holdKeyLines;
+				foreach my $holdKey ( @holdKeys )
+				{
+					printf STDERR "Hold key: %s, item key '%s' should be changed to '%s|%s|%s|%s|'.\n", $holdKey, $itemKey, $viableItemKey, $viableSeqNumber, $viableCopyNumber, $viableLocation;
+					report_or_fix_callseq_copyno( $holdKey, $viableSeqNumber, $viableCopyNumber );
+				}
 			}
 			else # Couldn't find the hold key with explicit use of cat key sequence number and copy number - there's a big problem.
 			{
-				printf STDERR "*** Panic: no hold found for item key '%s'!\n", $itemKey;
-				exit( 0 );
+				printf STDERR "*** Warn: no hold found for item key '%s'!\n", $itemKey;
 			}
 		}
 		else
