@@ -27,6 +27,7 @@
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Created: Thu Nov 19 14:26:00 MST 2015
 # Rev: 
+#          0.5.00 - Dynamically generated non-holdable locations. 
 #          0.4.01_a - Updated usage. 
 #          0.4.01 - Handle multiple hold keys that refer to an non-viable item. 
 #          0.4.00 - -I Take an item ID as an argument. 
@@ -38,7 +39,7 @@
 #          0.1.01 - Fix hold count error reporting. 
 #          0.1 - Production. 
 #          0.0 - Dev. 
-# Dependencies: pipe.pl, selhold, selitem, getpathname.
+# Dependencies: pipe.pl, selhold, selitem, getpathname, getpol.
 #
 ###################################################################
 
@@ -61,7 +62,7 @@ use Getopt::Std;
 $ENV{'PATH'}  = qq{:/s/sirsi/Unicorn/Bincustom:/s/sirsi/Unicorn/Bin:/usr/bin:/usr/sbin};
 $ENV{'UPATH'} = qq{/s/sirsi/Unicorn/Config/upath};
 ###############################################
-my $VERSION            = qq{0.4.01_a};
+my $VERSION            = qq{0.5.00};
 chomp( my $TEMP_DIR    = `getpathname tmp` );
 chomp( my $TIME        = `date +%H%M%S` );
 chomp( my $DATE        = `date +%Y%m%d` );
@@ -69,50 +70,8 @@ my @CLEAN_UP_FILE_LIST = (); # List of file names that will be deleted at the en
 chomp( my $BINCUSTOM   = `getpathname bincustom` );
 my $BROKEN_HOLD_KEYS   = "$TEMP_DIR/broken.holds.txt";
 my $CHANGED_HOLDS_LOG  = qq{changed_holds.log};
-# These are our invalid locations, your's willl vary. Use getpol to find invalid locations at your site.
-my @INVALID_LOCATIONS  = qw{
-UNKNOWN 
-REFERENCE
-MISSING
-LOST
-BINDERY
-DISCARD
-ILL
-RESERVES
-CATALOGING
-LOST-PAID
-REPAIR
-AVCOLL
-CANC_ORDER
-DISPLAY
-EPLBINDERY
-EPLCATALOG
-EPLILL
-GOVPUB
-FLICKTUNE
-INCOMPLETE
-INDEX
-INTERNET
-STORAGE
-STORAGEHER
-STORAGEREF
-DAMAGE
-BARCGRAVE
-ON-ORDER
-CANC_ORDER
-NON-ORDER
-REF-ORDER
-LOST-ASSUM
-LOST-CLAIM
-PROGRAM
-BESTSELLER
-REF-ORDER
-JBESTSELLR
-STORAGEGOV
-INSHIPPING
-STOLEN
-NOF
-MAKER};
+# These are our invalid locations which are gathered for your site automatically with getpol.
+my @INVALID_LOCATIONS  = qw{};
 
 #
 # Message about this program and how to use it.
@@ -198,6 +157,16 @@ example:
 Version: $VERSION
 EOF
     exit;
+}
+
+# Gathers the non-hold-able locations at your site. Populates the 
+# global @INVALID_LOCATIONS list.
+# param:  <none>
+# return: <none>
+sub get_nonholdable_locations()
+{
+	my $results = `getpol -tLOCN | pipe.pl -gc3:N -oc2`;
+	@INVALID_LOCATIONS = split '\n', $results;
 }
 
 # Removes all the temp files created during running of the script.
@@ -350,6 +319,11 @@ sub init
     my $opt_string = 'aB:h:i:I:rtUvx';
     getopts( "$opt_string", \%opt ) or usage();
     usage() if ( $opt{'x'} );
+	# Dynamically populate the non-holdable locations from the system policies.
+	my $results = `getpol -tLOCN | pipe.pl -gc3:N -oc2`;
+	# Keep a copy in case someone asks to see what the script thinks is non-holdable.
+	create_tmp_file( "fixitemholdsbot_sel_nonhold_loc_", $results );
+	@INVALID_LOCATIONS = split '\n', $results;
 }
 
 init();
