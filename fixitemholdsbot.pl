@@ -27,6 +27,8 @@
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Created: Thu Nov 19 14:26:00 MST 2015
 # Rev: 
+#          0.7.00 - Added -d debug. 
+#          0.6.00 - Only consider moving holds to items that have the circulate flag set to 'Y'. 
 #          0.5.00 - Dynamically generated non-holdable locations. 
 #          0.4.01_a - Updated usage. 
 #          0.4.01 - Handle multiple hold keys that refer to an non-viable item. 
@@ -62,7 +64,7 @@ use Getopt::Std;
 $ENV{'PATH'}  = qq{:/s/sirsi/Unicorn/Bincustom:/s/sirsi/Unicorn/Bin:/usr/bin:/usr/sbin};
 $ENV{'UPATH'} = qq{/s/sirsi/Unicorn/Config/upath};
 ###############################################
-my $VERSION            = qq{0.5.00};
+my $VERSION            = qq{0.7.00};
 chomp( my $TEMP_DIR    = `getpathname tmp` );
 chomp( my $TIME        = `date +%H%M%S` );
 chomp( my $DATE        = `date +%Y%m%d` );
@@ -123,6 +125,9 @@ following details
 Example:
  26679727|1805778|2|1|ACTIVE|N|
 
+ -c: Only consider moving holds to items that have the circulate flag set to 'Y'.
+     Otherwise just consider items in hold-able locations. 
+ -d: Debug.
  -a: Check entire hold table for holds with issues and report counts. The 
      hold selection is based on ACTIVE holds that point to non-existant 
      items. This does not report all holds that point to lost or stolen
@@ -154,6 +159,7 @@ example:
   $0 -B21221012345678 -vU
   $0 -i"item.keys.lst" -vrU
   $0 -I31221116214003 -vrUt
+  $0 -I31221116214003 -vrUtc
 Version: $VERSION
 EOF
     exit;
@@ -229,15 +235,27 @@ sub get_viable_itemKey( $$$ )
 	# Find all the items on the title. This may result in a list of anywhere from 1 - 'n' items.
 	# If the result is 1, we have a problem because it is the original item, which is the one that
 	# was causing the problem in the first place.
-	my $results = `echo "$ck" | selitem -iC -oIm 2>/dev/null`;
+	# Added 'c' to check circulation flag in case we need it with '-c'.
+	my $results = `echo "$ck" | selitem -iC -oImu 2>/dev/null`;
 	if ( $results )
 	{
 		my @resultLines = split '\n', $results;
 		foreach my $line ( @resultLines )
 		{
-			my ( $k, $s, $c, $l ) = split '\|', $line;
-			if ( ! grep( /($l)/, @INVALID_LOCATIONS ) )
+			my ( $k, $s, $c, $l, $circ ) = split '\|', $line;
+			if ( grep( /^($l)$/, @INVALID_LOCATIONS ) )
 			{
+				printf STDERR "I fire grep : %s\n", $line if ( $opt{'d'} );
+				next;
+			}
+			if ( $opt{'c'} && $circ !~ m/Y/ )
+			{
+				printf STDERR "I fire -c m/MN/ : %s\n", $line if ( $opt{'d'} );
+				next;
+			}
+			else
+			{
+				printf STDERR "I fire: %s\n", $line if ( $opt{'d'} );
 				( $newCK, $newSN, $newCN, $newLoc ) = split '\|', $line;
 				last;
 			}
@@ -306,8 +324,8 @@ sub report_or_fix_callseq_copyno( $$$ )
 	else # Just print out the results. This is to STDOUT so you can easily pipe to a script.
 	{
 		# Note that edithold -c for sequence number and -d for copy number!
-		printf "echo \"%s\" | edithold -c\"%s\"\n", $holdKey, $viableSeqNumber if ( $opt{'v'} );
-		printf "echo \"%s\" | edithold -d\"%s\"\n", $holdKey, $viableCopyNumber if ( $opt{'v'} );
+		printf "echo \"%s\" | edithold -c\"%d\"\n", $holdKey, $viableSeqNumber if ( $opt{'v'} || $opt{'d'} );
+		printf "echo \"%s\" | edithold -d\"%d\"\n", $holdKey, $viableCopyNumber if ( $opt{'v'} || $opt{'d'} );
 	}
 }
 
@@ -316,7 +334,7 @@ sub report_or_fix_callseq_copyno( $$$ )
 # return: 
 sub init
 {
-    my $opt_string = 'aB:h:i:I:rtUvx';
+    my $opt_string = 'aB:cdh:i:I:rtUvx';
     getopts( "$opt_string", \%opt ) or usage();
     usage() if ( $opt{'x'} );
 	# Dynamically populate the non-holdable locations from the system policies.
@@ -407,7 +425,7 @@ elsif ( $opt{'I'} ) # Check a specific item ID.
 }
 else # Neither required flag was supplied so report.
 {
-	printf STDERR "* warn, missing one of the required flags: -i, -B, -a, or -h. See below for more information.\n";
+	printf STDERR "* warn, missing required flag missing. See below for more information.\n";
 	usage();
 }
 if ( ! -s $item_keys )
@@ -446,9 +464,9 @@ while (<ITEM_KEYS>)
 					report_or_fix_callseq_copyno( $holdKey, $viableSeqNumber, $viableCopyNumber );
 				}
 			}
-			else # Couldn't find the hold key with explicit use of cat key sequence number and copy number - there's a big problem.
+			else # Couldn't find the hold key with explicit use of cat key sequence number and copy number.
 			{
-				printf STDERR "*** Warn: no hold found for item key '%s'!\n", $itemKey;
+				printf STDERR "no hold found for item key '%s'!\n", $itemKey;
 			}
 		}
 		else
