@@ -53,33 +53,35 @@ Example:
 ```
 26679727|1805778|2|1|ACTIVE|N|
 ```
-
+Generally this script assumes that viable holds can be found under any call
+number but -V restricts the selection to the same call number; volume holds.
 
 ```
  -c: Only consider moving holds to items that have the circulate flag set to 'Y'.
-     Otherwise just consider items in hold-able locations.
+     Otherwise just consider items in hold-able locations. 
  -d: Debug.
- -a: Check entire hold table for holds with issues and report counts. The
-     hold selection is based on ACTIVE holds that point to non-existant
+ -a: Check entire hold table for holds with issues and report counts. The 
+     hold selection is based on ACTIVE holds that point to non-existant 
      items. This does not report all holds that point to lost or stolen
      or discarded items. That would simply take too long.
  -B<user_id>: Input a specific user id, analyse.
  -h<hold_key>: Input a specific hold key. This operation will look at all
-     holds for the title that are placed on items that are currently in
+     holds for the title that are placed on items that are currently in 
      invalid locations like discard, missing, or stolen.
  -i<item_id_file>: Moves a hold from a specific item (like ON-ORDER) to another
      viable item. This may not be possible if the only other items are in
      non-viable locations or there is only one item on the title. Item keys
      should appear as the first non-white space data on each line, in pipe-
-     delimited format. New lines are Unix style line endings. Example:
+     delimited format. New lines are Unix style line endings. Example: 
      '12345|6|7|'
      '12345|66|7|ocn2442309|Treasure Island|'
  -I<item_barcode>: Moves holds from a specific item based on it's item ID if
      required, and if possible.
  -r: Prints TCNs and title of un-fixable holds to STDOUT.
- -t: Preserve temporary files in /tmp.
+ -t: Preserve temporary files in $TEMP_DIR.
  -U: Do the work, otherwise just print what would do to STDERR.
  -v: Verbose output.
+ -V: Assume volume holds, restrict holds to the same call number.
  -x: This (help) message.
 ```
  

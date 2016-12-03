@@ -27,6 +27,7 @@
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Created: Thu Nov 19 14:26:00 MST 2015
 # Rev: 
+#          0.8.00 - Added -V restrict holds by call number. 
 #          0.7.00 - Added -d debug. 
 #          0.6.00 - Only consider moving holds to items that have the circulate flag set to 'Y'. 
 #          0.5.00 - Dynamically generated non-holdable locations. 
@@ -64,7 +65,7 @@ use Getopt::Std;
 $ENV{'PATH'}  = qq{:/s/sirsi/Unicorn/Bincustom:/s/sirsi/Unicorn/Bin:/usr/bin:/usr/sbin};
 $ENV{'UPATH'} = qq{/s/sirsi/Unicorn/Config/upath};
 ###############################################
-my $VERSION            = qq{0.7.00};
+my $VERSION            = qq{0.8.00};
 chomp( my $TEMP_DIR    = `getpathname tmp` );
 chomp( my $TIME        = `date +%H%M%S` );
 chomp( my $DATE        = `date +%Y%m%d` );
@@ -124,6 +125,9 @@ following details
  HoldKey |CatKey |OriginalSeq|OriginalCopy|HoldStatus|Availability|
 Example:
  26679727|1805778|2|1|ACTIVE|N|
+ 
+Generally this script assumes that viable holds can be found under any call
+number but -V restricts the selection to the same call number; volume holds.
 
  -c: Only consider moving holds to items that have the circulate flag set to 'Y'.
      Otherwise just consider items in hold-able locations. 
@@ -149,6 +153,7 @@ Example:
  -t: Preserve temporary files in $TEMP_DIR.
  -U: Do the work, otherwise just print what would do to STDERR.
  -v: Verbose output.
+ -V: Assume volume holds, restrict holds to the same call number.
  -x: This (help) message.
 
 example:
@@ -236,7 +241,16 @@ sub get_viable_itemKey( $$$ )
 	# If the result is 1, we have a problem because it is the original item, which is the one that
 	# was causing the problem in the first place.
 	# Added 'c' to check circulation flag in case we need it with '-c'.
-	my $results = `echo "$ck" | selitem -iC -oImu 2>/dev/null`;
+	my $results = '';
+	# Select based on call number.
+	if ( $opt{'V'} )
+	{
+		$results = `echo "$ck|$sn|" | selitem -iN -oImu 2>/dev/null`;
+	}
+	else
+	{
+		$results = `echo "$ck" | selitem -iC -oImu 2>/dev/null`;
+	}
 	if ( $results )
 	{
 		my @resultLines = split '\n', $results;
