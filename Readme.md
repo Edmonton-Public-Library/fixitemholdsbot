@@ -68,15 +68,15 @@ number but -V restricts the selection to the same call number; volume holds.
  -h<hold_key>: Input a specific hold key. This operation will look at all
      holds for the title that are placed on items that are currently in 
      invalid locations like discard, missing, or stolen.
- -i<item_id_file>: Moves a hold from a specific item (like ON-ORDER) to another
-     viable item. This may not be possible if the only other items are in
-     non-viable locations or there is only one item on the title. Item keys
+ -i<item_id_file>: Moves holds from a specific item keys listed
+     in the argument file. See '-I' for similar operation. Item keys
      should appear as the first non-white space data on each line, in pipe-
      delimited format. New lines are Unix style line endings. Example: 
      '12345|6|7|'
      '12345|66|7|ocn2442309|Treasure Island|'
  -I<item_barcode>: Moves holds from a specific item based on it's item ID if
-     required, and if possible.
+     required, and if possible. This may not be possible if the only other items are in
+     non-viable locations, or there is only one item on the title.
  -r: Prints TCNs and title of un-fixable holds to STDOUT.
  -t: Preserve temporary files in $TEMP_DIR.
  -U: Do the work, otherwise just print what would do to STDERR.
