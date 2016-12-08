@@ -79,7 +79,7 @@ number but -V restricts the selection to the same call number; volume holds.
      non-viable locations, or there is only one item on the title.
  -r: Prints TCNs and title of un-fixable holds to STDOUT.
  -t: Preserve temporary files in $TEMP_DIR.
- -U: Do the work, otherwise just print what would do to STDERR.
+ -U: Do the work, otherwise just print what would happen to STDERR.
  -v: Verbose output.
  -V: Assume volume holds, restrict holds to the same call number.
  -x: This (help) message.

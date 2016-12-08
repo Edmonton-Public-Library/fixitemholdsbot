@@ -1,11 +1,11 @@
 #!/usr/bin/perl -w
 ###################################################################
 #
-# Perl source file for project deleteme 
+# Perl source file for project deleteme
 # Purpose: Fix item database errors.
 # Method:  Symphony API
 #
-# Audit and fix holds that point to invalid items resulting in item 
+# Audit and fix holds that point to invalid items resulting in item
 # database errors.
 #    Copyright (C) 2015  Andrew Nisbet
 #
@@ -13,12 +13,12 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
@@ -26,23 +26,23 @@
 #
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Created: Thu Nov 19 14:26:00 MST 2015
-# Rev: 
-#          0.8.00_a - Fixed usage notes. 
-#          0.8.00 - Added -V restrict holds by call number. 
-#          0.7.00 - Added -d debug. 
-#          0.6.00 - Only consider moving holds to items that have the circulate flag set to 'Y'. 
-#          0.5.00 - Dynamically generated non-holdable locations. 
-#          0.4.01_a - Updated usage. 
-#          0.4.01 - Handle multiple hold keys that refer to an non-viable item. 
-#          0.4.00 - -I Take an item ID as an argument. 
-#          0.3.00 - -i Shuffle holds by item key. 
-#          0.2.02 - -v verbose output. 
-#          0.2.00 - -u for user id. 
-#          0.1.04 - Added -r, -i for hold key, refactored and tested. 
-#          0.1.02 - Added temp file path to broken holds. 
-#          0.1.01 - Fix hold count error reporting. 
-#          0.1 - Production. 
-#          0.0 - Dev. 
+# Rev:
+#          0.8.00_a - Fixed usage notes.
+#          0.8.00 - Added -V restrict holds by call number.
+#          0.7.00 - Added -d debug.
+#          0.6.00 - Only consider moving holds to items that have the circulate flag set to 'Y'.
+#          0.5.00 - Dynamically generated non-holdable locations.
+#          0.4.01_a - Updated usage.
+#          0.4.01 - Handle multiple hold keys that refer to an non-viable item.
+#          0.4.00 - -I Take an item ID as an argument.
+#          0.3.00 - -i Shuffle holds by item key.
+#          0.2.02 - -v verbose output.
+#          0.2.00 - -u for user id.
+#          0.1.04 - Added -r, -i for hold key, refactored and tested.
+#          0.1.02 - Added temp file path to broken holds.
+#          0.1.01 - Fix hold count error reporting.
+#          0.1 - Production.
+#          0.0 - Dev.
 # Dependencies: pipe.pl, selhold, selitem, getpathname, getpol.
 #
 ###################################################################
@@ -52,13 +52,13 @@ use warnings;
 use vars qw/ %opt /;
 use Getopt::Std;
 
-# Item database errors occur on accounts when the customer has a hold who's 
-# hold key contains an item key that no longer exists. We are not sure how 
-# this happens but suspect that demand management either selects an item that 
-# is then removed like a DISCARD, or fails to update items that have been 
-# discarded to valid item keys. No matter, fixing the issues requires finding 
+# Item database errors occur on accounts when the customer has a hold who's
+# hold key contains an item key that no longer exists. We are not sure how
+# this happens but suspect that demand management either selects an item that
+# is then removed like a DISCARD, or fails to update items that have been
+# discarded to valid item keys. No matter, fixing the issues requires finding
 # the errant hold and changing it to point to an item in a valid current location.
-# 
+#
 # Environment setup required by cron to run script because its daemon runs
 # without assuming any environment settings and we need to use sirsi's.
 ###############################################
@@ -85,21 +85,21 @@ sub usage()
     print STDERR << "EOF";
 
 	usage: $0 [-a|-B<user_id>|-h<hold_key>|-i<item_id_file>|-I<item_id>] {rtUvx]
-Item database errors occur on accounts when the customer has a hold, who's 
+Item database errors occur on accounts when the customer has a hold, who's
 hold key contains an item key that no longer exists. The script has
 different modes of operation. If '-a' switch is used, the entire hold table
 is searched for active holds that point to item keys that don't exist with
 the following API.
 
- selhold -jACTIVE -oI 2>/dev/null | selitem -iI  2>$BROKEN_HOLD_KEYS 
- 
+ selhold -jACTIVE -oI 2>/dev/null | selitem -iI  2>$BROKEN_HOLD_KEYS
+
 The script collects all the errors and parses the item keys before proceeding
 to fix these items.
 
 Another mode uses '-h' with a specific hold key. In this case the script
-will find all the holds that are sitting on items that are in problematic 
+will find all the holds that are sitting on items that are in problematic
 current locations. Once a hold on an invalid item has been identified, the
-script will report the best item replacement. 
+script will report the best item replacement.
 
 A third mode allows the input of an item key file ('-i'), and will move holds from
 a specific item to another viable item on the same title. This may not be possible
@@ -110,15 +110,15 @@ Another common request is to fix holds on an item based on the item id. This
 can be done with the '-I' flag.
 
 Finally the '-B' switch will analyse the holds for a specific use and move the
-holds that currently rest on non-viable items if possible. This may not be 
-possible if the hold is on a title with only one item, or all the items on 
-the title are non-viable (current locations are included in the list of 
+holds that currently rest on non-viable items if possible. This may not be
+possible if the hold is on a title with only one item, or all the items on
+the title are non-viable (current locations are included in the list of
 non-viable locations).
 
 If the '-U' switch is used the hold will be updated without the customer
-losing their place in the queue. If no viable item could be found to move 
-the hold to, the TCN and title will be reported to STDOUT if '-r' is selected, 
-otherwise the item key is printed to STDERR along with a message explaining 
+losing their place in the queue. If no viable item could be found to move
+the hold to, the TCN and title will be reported to STDOUT if '-r' is selected,
+otherwise the item key is printed to STDERR along with a message explaining
 why the hold could not be moved.
 
 Any holds that are moved are added to the $CHANGED_HOLDS_LOG file with the
@@ -126,25 +126,25 @@ following details
  HoldKey |CatKey |OriginalSeq|OriginalCopy|HoldStatus|Availability|
 Example:
  26679727|1805778|2|1|ACTIVE|N|
- 
+
 Generally this script assumes that viable holds can be found under any call
 number but -V restricts the selection to the same call number; volume holds.
 
  -c: Only consider moving holds to items that have the circulate flag set to 'Y'.
-     Otherwise just consider items in hold-able locations. 
+     Otherwise just consider items in hold-able locations.
  -d: Debug.
- -a: Check entire hold table for holds with issues and report counts. The 
-     hold selection is based on ACTIVE holds that point to non-existant 
+ -a: Check entire hold table for holds with issues and report counts. The
+     hold selection is based on ACTIVE holds that point to non-existant
      items. This does not report all holds that point to lost or stolen
      or discarded items. That would simply take too long.
  -B<user_id>: Input a specific user id, analyse.
  -h<hold_key>: Input a specific hold key. This operation will look at all
-     holds for the title that are placed on items that are currently in 
+     holds for the title that are placed on items that are currently in
      invalid locations like discard, missing, or stolen.
  -i<item_id_file>: Moves holds from a specific item keys listed
      in the argument file. See '-I' for similar operation. Item keys
      should appear as the first non-white space data on each line, in pipe-
-     delimited format. New lines are Unix style line endings. Example: 
+     delimited format. New lines are Unix style line endings. Example:
      '12345|6|7|'
      '12345|66|7|ocn2442309|Treasure Island|'
  -I<item_barcode>: Moves holds from a specific item based on it's item ID if
@@ -152,7 +152,7 @@ number but -V restricts the selection to the same call number; volume holds.
      non-viable locations, or there is only one item on the title.
  -r: Prints TCNs and title of un-fixable holds to STDOUT.
  -t: Preserve temporary files in $TEMP_DIR.
- -U: Do the work, otherwise just print what would do to STDERR.
+ -U: Do the work, otherwise just print what would happen to STDERR.
  -v: Verbose output.
  -V: Assume volume holds, restrict holds to the same call number.
  -x: This (help) message.
@@ -171,7 +171,7 @@ EOF
     exit;
 }
 
-# Gathers the non-hold-able locations at your site. Populates the 
+# Gathers the non-hold-able locations at your site. Populates the
 # global @INVALID_LOCATIONS list.
 # param:  <none>
 # return: <none>
@@ -226,7 +226,7 @@ sub create_tmp_file( $$ )
 	return $master_file;
 }
 
-# Gets a viable item id from all of the item ids on a title. 
+# Gets a viable item id from all of the item ids on a title.
 # param:  cat key of the offending item.
 # param:  sequence number of the offending item.
 # param:  copy number of the offending item.
@@ -285,9 +285,9 @@ sub get_viable_itemKey( $$$ )
 }
 
 # Does the initial collection of all the hold keys that have problems. The selection
-# is based on Symphony API: 
+# is based on Symphony API:
 #   selhold -jACTIVE -oI 2>/dev/null | selitem -iI  2>"$BROKEN_HOLD_KEYS" >/dev/null
-# Where we collect all the error 111s and use the information in them. Note that in 
+# Where we collect all the error 111s and use the information in them. Note that in
 # older releases of Symphony the item IDs are wrong but the cat key, sequence number
 # and copy number can be used.
 # param:  File name that contains the broken hold errors as in the example below.
@@ -306,8 +306,8 @@ sub collect_broken_holds( $ )
 	chomp( my $results = `cat "$err_file" | pipe.pl -g'c0:error' | wc -l` );
 	$results = `echo "$results" | pipe.pl -tc0`;
 	printf STDERR "Found %d hold error(s).\n", $results;
-	# We need output to look like: '744637|116|1|'. The next line does this. Note that if you cut and paste this 
-	# line for testing remove the extra backslash in the last pipe.pl command. You need it if you run from a 
+	# We need output to look like: '744637|116|1|'. The next line does this. Note that if you cut and paste this
+	# line for testing remove the extra backslash in the last pipe.pl command. You need it if you run from a
 	# script but not from the command line.
 	$results = `cat "$err_file" | pipe.pl -W'=' -oc1,c2,c3 -h' ' | pipe.pl -W'\\s+' -zc0 -oc0,c2,c4 -P`;
 	my $itemIdFile = create_tmp_file( "fixitemholdsbot_a_", $results );
@@ -345,8 +345,8 @@ sub report_or_fix_callseq_copyno( $$$ )
 }
 
 # Kicks off the setting of various switches.
-# param:  
-# return: 
+# param:
+# return:
 sub init
 {
     my $opt_string = 'aB:cdh:i:I:rtUvx';
@@ -449,7 +449,7 @@ if ( ! -s $item_keys )
 	exit( 0 );
 }
 # Open the $dedupItemIdFile file and use the cat key to get all the item keys.
-# We will use the locations to determine viable copies and then choose the 
+# We will use the locations to determine viable copies and then choose the
 # sequence number and copy number (if necessary) from a viable item with a reasonable location.
 open ITEM_KEYS, "<$item_keys" || die "** error opening '$item_keys', $!.\n";
 while (<ITEM_KEYS>)
@@ -458,7 +458,7 @@ while (<ITEM_KEYS>)
 	chomp( my $itemKey = $_ );
 	my ( $viableItemKey, $viableSeqNumber, $viableCopyNumber, $viableLocation ) = get_viable_itemKey( $catKey, $seqNumber, $copyNumber );
 	# So long as the viable seq #, and viable copy are not the same as the old ones and not empty then proceed.
-	# We don't want to make changes unnecessarily 
+	# We don't want to make changes unnecessarily
 	if ( $viableSeqNumber && $viableCopyNumber )
 	{
 		if ( ( $viableSeqNumber != $seqNumber || $viableCopyNumber != $copyNumber ) )
