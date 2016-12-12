@@ -27,6 +27,7 @@
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Created: Thu Nov 19 14:26:00 MST 2015
 # Rev:
+#          0.8.00_d - Forgot to activate -V.
 #          0.8.00_c - Updated usage notes.
 #          0.8.00_b - Refactored get policy of non-hold-able locations.
 #          0.8.00_a - Fixed usage notes.
@@ -68,7 +69,7 @@ use Getopt::Std;
 $ENV{'PATH'}  = qq{:/s/sirsi/Unicorn/Bincustom:/s/sirsi/Unicorn/Bin:/usr/bin:/usr/sbin};
 $ENV{'UPATH'} = qq{/s/sirsi/Unicorn/Config/upath};
 ###############################################
-my $VERSION            = qq{0.8.00_c};
+my $VERSION            = qq{0.8.00_d};
 chomp( my $TEMP_DIR    = `getpathname tmp` );
 chomp( my $TIME        = `date +%H%M%S` );
 chomp( my $DATE        = `date +%Y%m%d` );
@@ -341,7 +342,7 @@ sub report_or_fix_callseq_copyno( $$$ )
 # return:
 sub init
 {
-    my $opt_string = 'aB:cdh:i:I:rtUvx';
+    my $opt_string = 'aB:cdh:i:I:rtUvVx';
     getopts( "$opt_string", \%opt ) or usage();
     usage() if ( $opt{'x'} );
 	# Dynamically populate the non-holdable locations from the system policies.
