@@ -27,6 +27,7 @@
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Created: Thu Nov 19 14:26:00 MST 2015
 # Rev:
+#          0.8.00_c - Updated usage notes.
 #          0.8.00_b - Refactored get policy of non-hold-able locations.
 #          0.8.00_a - Fixed usage notes.
 #          0.8.00 - Added -V restrict holds by call number.
@@ -67,7 +68,7 @@ use Getopt::Std;
 $ENV{'PATH'}  = qq{:/s/sirsi/Unicorn/Bincustom:/s/sirsi/Unicorn/Bin:/usr/bin:/usr/sbin};
 $ENV{'UPATH'} = qq{/s/sirsi/Unicorn/Config/upath};
 ###############################################
-my $VERSION            = qq{0.8.00_b};
+my $VERSION            = qq{0.8.00_c};
 chomp( my $TEMP_DIR    = `getpathname tmp` );
 chomp( my $TIME        = `date +%H%M%S` );
 chomp( my $DATE        = `date +%Y%m%d` );
@@ -85,7 +86,7 @@ sub usage()
 {
     print STDERR << "EOF";
 
-	usage: $0 [-a|-B<user_id>|-h<hold_key>|-i<item_id_file>|-I<item_id>] {rtUvx]
+	usage: $0 [-a|-B<user_id>|-h<hold_key>|-i<item_id_file>|-I<item_id>] {cdrtUvVx]
 Item database errors occur on accounts when the customer has a hold, who's
 hold key contains an item key that no longer exists. The script has
 different modes of operation. If '-a' switch is used, the entire hold table
@@ -131,14 +132,14 @@ Example:
 Generally this script assumes that viable holds can be found under any call
 number but -V restricts the selection to the same call number; volume holds.
 
- -c: Only consider moving holds to items that have the circulate flag set to 'Y'.
-     Otherwise just consider items in hold-able locations.
- -d: Debug.
  -a: Check entire hold table for holds with issues and report counts. The
      hold selection is based on ACTIVE holds that point to non-existant
      items. This does not report all holds that point to lost or stolen
      or discarded items. That would simply take too long.
  -B<user_id>: Input a specific user id, analyse.
+ -c: Only consider moving holds to items that have the circulate flag set to 'Y'.
+     Otherwise just consider items in hold-able locations.
+ -d: Debug.
  -h<hold_key>: Input a specific hold key. This operation will look at all
      holds for the title that are placed on items that are currently in
      invalid locations like discard, missing, or stolen.
