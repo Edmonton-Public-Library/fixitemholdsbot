@@ -27,6 +27,7 @@
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Created: Thu Nov 19 14:26:00 MST 2015
 # Rev:
+#          0.8.00_b - Refactored get policy of non-hold-able locations.
 #          0.8.00_a - Fixed usage notes.
 #          0.8.00 - Added -V restrict holds by call number.
 #          0.7.00 - Added -d debug.
@@ -66,7 +67,7 @@ use Getopt::Std;
 $ENV{'PATH'}  = qq{:/s/sirsi/Unicorn/Bincustom:/s/sirsi/Unicorn/Bin:/usr/bin:/usr/sbin};
 $ENV{'UPATH'} = qq{/s/sirsi/Unicorn/Config/upath};
 ###############################################
-my $VERSION            = qq{0.8.00_a};
+my $VERSION            = qq{0.8.00_b};
 chomp( my $TEMP_DIR    = `getpathname tmp` );
 chomp( my $TIME        = `date +%H%M%S` );
 chomp( my $DATE        = `date +%Y%m%d` );
@@ -169,16 +170,6 @@ example:
 Version: $VERSION
 EOF
     exit;
-}
-
-# Gathers the non-hold-able locations at your site. Populates the
-# global @INVALID_LOCATIONS list.
-# param:  <none>
-# return: <none>
-sub get_nonholdable_locations()
-{
-	my $results = `getpol -tLOCN | pipe.pl -gc3:N -oc2`;
-	@INVALID_LOCATIONS = split '\n', $results;
 }
 
 # Removes all the temp files created during running of the script.
