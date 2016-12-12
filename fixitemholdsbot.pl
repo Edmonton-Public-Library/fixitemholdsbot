@@ -27,6 +27,7 @@
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Created: Thu Nov 19 14:26:00 MST 2015
 # Rev:
+#          0.8.00_e - Forgot to activate -V.
 #          0.8.00_d - Forgot to activate -V.
 #          0.8.00_c - Updated usage notes.
 #          0.8.00_b - Refactored get policy of non-hold-able locations.
@@ -69,7 +70,7 @@ use Getopt::Std;
 $ENV{'PATH'}  = qq{:/s/sirsi/Unicorn/Bincustom:/s/sirsi/Unicorn/Bin:/usr/bin:/usr/sbin};
 $ENV{'UPATH'} = qq{/s/sirsi/Unicorn/Config/upath};
 ###############################################
-my $VERSION            = qq{0.8.00_d};
+my $VERSION            = qq{0.8.00_e};
 chomp( my $TEMP_DIR    = `getpathname tmp` );
 chomp( my $TIME        = `date +%H%M%S` );
 chomp( my $DATE        = `date +%Y%m%d` );
@@ -490,7 +491,7 @@ while (<ITEM_KEYS>)
 		}
 		else
 		{
-			printf STDERR "* warning: item key '%s' has no viable items.\n", $itemKey;
+			printf STDERR "* warning: item key '%s' has no viable sibling items.\n", $itemKey;
 		}
 	}
 }
