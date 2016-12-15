@@ -9,21 +9,21 @@ fixitemholdsbot.pl -x
 
 Product Description:
 --------------------
-Item database errors occur on accounts when the customer has a hold, who's 
+Item database errors occur on accounts when the customer has a hold, who's
 hold key contains an item key that no longer exists. The script has
 different modes of operation. If '-a' switch is used, the entire hold table
 is searched for active holds that point to item keys that don't exist with
 the following API.
 
- selhold -jACTIVE -oI 2>/dev/null | selitem -iI  2>$BROKEN_HOLD_KEYS 
- 
+ selhold -jACTIVE -oI 2>/dev/null | selitem -iI  2>$BROKEN_HOLD_KEYS
+
 The script collects all the errors and parses the item keys before proceeding
 to fix these items.
 
 Another mode uses '-h' with a specific hold key. In this case the script
-will find all the holds that are sitting on items that are in problematic 
+will find all the holds that are sitting on items that are in problematic
 current locations. Once a hold on an invalid item has been identified, the
-script will report the best item replacement. 
+script will report the best item replacement.
 
 A third mode allows the input of an item key file ('-i'), and will move holds from
 a specific item to another viable item on the same title. This may not be possible
@@ -34,15 +34,15 @@ Another common request is to fix holds on an item based on the item id. This
 can be done with the '-I' flag.
 
 Finally the '-B' switch will analyse the holds for a specific use and move the
-holds that currently rest on non-viable items if possible. This may not be 
-possible if the hold is on a title with only one item, or all the items on 
-the title are non-viable (current locations are included in the list of 
+holds that currently rest on non-viable items if possible. This may not be
+possible if the hold is on a title with only one item, or all the items on
+the title are non-viable (current locations are included in the list of
 non-viable locations).
 
 If the '-U' switch is used the hold will be updated without the customer
-losing their place in the queue. If no viable item could be found to move 
-the hold to, the TCN and title will be reported to STDOUT if '-r' is selected, 
-otherwise the item key is printed to STDERR along with a message explaining 
+losing their place in the queue. If no viable item could be found to move
+the hold to, the TCN and title will be reported to STDOUT if '-r' is selected,
+otherwise the item key is printed to STDERR along with a message explaining
 why the hold could not be moved.
 
 Any holds that are moved are added to the changed_holds.log file with the following details.
@@ -54,9 +54,8 @@ Example:
 26679727|1805778|2|1|ACTIVE|N|
 ```
 
-
 ```
- -a: Check entire hold table for holds with issues and report counts. The
+-a: Check entire hold table for holds with issues and report counts. The
      hold selection is based on ACTIVE holds that point to non-existant
      items. This does not report all holds that point to lost or stolen
      or discarded items. That would simply take too long.
@@ -80,7 +79,7 @@ Example:
  -t: Preserve temporary files in $TEMP_DIR.
  -U: Do the work, otherwise just print what would happen to STDERR.
  -v: Verbose output.
- -V: Assume volume holds, restrict holds to the same call number.
+ -V: Enforce the restriction of holds to the same call number.
  -x: This (help) message.
 ```
  

@@ -27,7 +27,8 @@
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Created: Thu Nov 19 14:26:00 MST 2015
 # Rev:
-#          0.8.00_e - Forgot to activate -V.
+#          0.9.00   - Added '-.
+#          0.8.00_e - Fixed ordering of usage flags.
 #          0.8.00_d - Forgot to activate -V.
 #          0.8.00_c - Updated usage notes.
 #          0.8.00_b - Refactored get policy of non-hold-able locations.
@@ -70,7 +71,7 @@ use Getopt::Std;
 $ENV{'PATH'}  = qq{:/s/sirsi/Unicorn/Bincustom:/s/sirsi/Unicorn/Bin:/usr/bin:/usr/sbin};
 $ENV{'UPATH'} = qq{/s/sirsi/Unicorn/Config/upath};
 ###############################################
-my $VERSION            = qq{0.8.00_e};
+my $VERSION            = qq{0.9.00};
 chomp( my $TEMP_DIR    = `getpathname tmp` );
 chomp( my $TIME        = `date +%H%M%S` );
 chomp( my $DATE        = `date +%Y%m%d` );
@@ -131,9 +132,6 @@ following details
 Example:
  26679727|1805778|2|1|ACTIVE|N|
 
-Generally this script assumes that viable holds can be found under any call
-number but -V restricts the selection to the same call number; volume holds.
-
  -a: Check entire hold table for holds with issues and report counts. The
      hold selection is based on ACTIVE holds that point to non-existant
      items. This does not report all holds that point to lost or stolen
@@ -158,7 +156,7 @@ number but -V restricts the selection to the same call number; volume holds.
  -t: Preserve temporary files in $TEMP_DIR.
  -U: Do the work, otherwise just print what would happen to STDERR.
  -v: Verbose output.
- -V: Assume volume holds, restrict holds to the same call number.
+ -V: Enforce the restriction of holds to the same call number.
  -x: This (help) message.
 
 example:
@@ -220,6 +218,26 @@ sub create_tmp_file( $$ )
 	return $master_file;
 }
 
+# Returns the call number's analytical position which indicates the character position
+# of the '|z' sub-field on the 099 entry. If the value is '0', there are no volumes.
+# While this is how this is documented in Symphony, it doesn't work this way and there is no consistent way
+# to identify true multi-volume titles as apposed to call nums that have '|z' or a non-
+# zero analytical position.
+# param:  String call number.
+# return: 0 if there is no volumes on the title (the analytic position of '|z' sub-field
+#         was not found), or a number > 0 otherwise.
+sub is_volume_title( $ )
+{
+	my $call_number = shift;
+	my $result = `echo "$call_number" | selitem -iN -oa 2>/dev/null | pipe.pl -oc0`;
+	if ( ! $result )
+	{
+		printf STDERR "* warn, could not retrieve analytic position on call number '%s'\n", $call_number if ( $opt{'v'} || $opt{'d'} );
+		return 0;
+	}
+	return $result;
+}
+
 # Gets a viable item id from all of the item ids on a title.
 # param:  cat key of the offending item.
 # param:  sequence number of the offending item.
@@ -237,7 +255,8 @@ sub get_viable_itemKey( $$$ )
 	# was causing the problem in the first place.
 	# Added 'c' to check circulation flag in case we need it with '-c'.
 	my $results = '';
-	# Select based on call number.
+	# Select based on call number. 
+	# if ( $opt{'V'} or is_volume_title( "$ck|$sn|" ) )
 	if ( $opt{'V'} )
 	{
 		$results = `echo "$ck|$sn|" | selitem -iN -oImu 2>/dev/null`;
