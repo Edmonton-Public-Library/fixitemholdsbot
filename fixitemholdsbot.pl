@@ -7,7 +7,7 @@
 #
 # Audit and fix holds that point to invalid items resulting in item
 # database errors.
-#    Copyright (C) 2015  Andrew Nisbet
+#    Copyright (C) 2016  Andrew Nisbet
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,8 +25,10 @@
 # MA 02110-1301, USA.
 #
 # Author:  Andrew Nisbet, Edmonton Public Library
-# Created: Thu Nov 19 14:26:00 MST 2015
+# Created: Thu Nov 19 14:26:00 MST 2016
 # Rev:
+#          0.10.01  - Report each title only once.
+#          0.10.00  - Added -H to handle a file of hold keys.
 #          0.9.00   - Added '-c' flag.
 #          0.8.00_e - Fixed ordering of usage flags.
 #          0.8.00_d - Forgot to activate -V.
@@ -71,7 +73,7 @@ use Getopt::Std;
 $ENV{'PATH'}  = qq{:/s/sirsi/Unicorn/Bincustom:/s/sirsi/Unicorn/Bin:/usr/bin:/usr/sbin};
 $ENV{'UPATH'} = qq{/s/sirsi/Unicorn/Config/upath};
 ###############################################
-my $VERSION            = qq{0.9.00};
+my $VERSION            = qq{0.10.01};
 chomp( my $TEMP_DIR    = `getpathname tmp` );
 chomp( my $TIME        = `date +%H%M%S` );
 chomp( my $DATE        = `date +%Y%m%d` );
@@ -81,6 +83,7 @@ my $BROKEN_HOLD_KEYS   = "$TEMP_DIR/broken.holds.txt";
 my $CHANGED_HOLDS_LOG  = qq{changed_holds.log};
 # These are our invalid locations which are gathered for your site automatically with getpol.
 my @INVALID_LOCATIONS  = qw{};
+my $UNIQ_ITEM_KEY_REF  = {};
 
 #
 # Message about this program and how to use it.
@@ -89,7 +92,7 @@ sub usage()
 {
     print STDERR << "EOF";
 
-	usage: $0 [-a|-B<user_id>|-h<hold_key>|-i<item_id_file>|-I<item_id>] {cdrtUvVx]
+	usage: $0 [-a|-B<user_id>|-h<hold_key>|-H<hold_key_file>|-i<item_id_file>|-I<item_id>] {cdrtUvVx]
 Item database errors occur on accounts when the customer has a hold, who's
 hold key contains an item key that no longer exists. The script has
 different modes of operation. If '-a' switch is used, the entire hold table
@@ -143,6 +146,12 @@ Example:
  -h<hold_key>: Input a specific hold key. This operation will look at all
      holds for the title that are placed on items that are currently in
      invalid locations like discard, missing, or stolen.
+ -H<hold_key_file>: Moves holds from a specific hold keys listed
+     in the argument file. See '-h' for similar operation. Hold keys
+     should appear as the first non-white space data on each line, in pipe-
+     delimited format. New lines are Unix style line endings. Example:
+     '2101992|'
+     '2101992|ocn2442309|Treasure Island|'
  -i<item_id_file>: Moves holds from a specific item keys listed
      in the argument file. See '-I' for similar operation. Item keys
      should appear as the first non-white space data on each line, in pipe-
@@ -152,7 +161,7 @@ Example:
  -I<item_barcode>: Moves holds from a specific item based on it's item ID if
      required, and if possible. This may not be possible if the only other items are in
      non-viable locations, or there is only one item on the title.
- -r: Prints TCNs and title of un-fixable holds to STDOUT.
+ -r: Prints TCNs and title of un-fixable holds to STDOUT. Each title reported uniquely.
  -t: Preserve temporary files in $TEMP_DIR.
  -U: Do the work, otherwise just print what would happen to STDERR.
  -v: Verbose output.
@@ -168,6 +177,9 @@ example:
   $0 -i"item.keys.lst" -vrU
   $0 -I31221116214003 -vrUt
   $0 -I31221116214003 -vrUtc
+Cancel the holds, listed by hold key, in the argument file. Report if you can't do it, actually do it
+if you can, and restrict to circulate-able items.
+  $0 -H"hold.keys.lst" -rUc
 Version: $VERSION
 EOF
     exit;
@@ -362,7 +374,7 @@ sub report_or_fix_callseq_copyno( $$$ )
 # return:
 sub init
 {
-    my $opt_string = 'aB:cdh:i:I:rtUvVx';
+    my $opt_string = 'aB:cdh:H:i:I:rtUvVx';
     getopts( "$opt_string", \%opt ) or usage();
     usage() if ( $opt{'x'} );
 	# Dynamically populate the non-holdable locations from the system policies.
@@ -424,6 +436,23 @@ elsif ( $opt{'B'} )
 		printf STDERR "No errors on account %s.\n", $opt{'B'};
 		exit( 0 );
 	}
+}
+elsif ( $opt{'H'} ) # Cancels holds by hold key file.
+{
+	# Check the user supplied a real non-empty file.
+	if ( ! -s $opt{'H'} )
+	{
+		printf STDERR "** error invalid item key file '%s'.\n", $opt{'H'};
+		exit( 0 );
+	}
+	# Get the item IDs from the hold keys, but make sure the holds are active and not available.
+	my $results = `cat "$opt{'H'}" | selhold -iK -jACTIVE -aN -oI 2>/dev/null`;
+	if ( ! $results )
+	{
+		printf STDERR "* Warn: no active available hold keys in '%s'.\n", $opt{'H'};
+		exit( 0 );
+	}
+	$item_keys = create_tmp_file( "fixitemholdsbot_sel_optH_", $results );
 }
 elsif ( $opt{'i'} ) # Check a specific hold key.
 {
@@ -504,14 +533,20 @@ while (<ITEM_KEYS>)
 	}
 	else
 	{
-		if ( $opt{'r'} )
-		{
-			printf `echo "$itemKey" | selcatalog -iC -oFt 2>/dev/null`;
-		}
-		else
-		{
-			printf STDERR "* warning: item key '%s' has no viable sibling items.\n", $itemKey;
-		}
+		# Output unique title information, that is, only report once per title problem.
+		$UNIQ_ITEM_KEY_REF->{ $itemKey } = 1;
+	}
+}
+# Report what happened if necessary.
+for my $key ( keys %$UNIQ_ITEM_KEY_REF ) 
+{
+	if ( $opt{'r'} )
+	{
+		printf `echo "$key" | selcatalog -iC -oFt 2>/dev/null`;
+	}
+	else
+	{
+		printf STDERR "* warning: item key '%s' has no viable sibling items.\n", $key;
 	}
 }
 ### code ends
