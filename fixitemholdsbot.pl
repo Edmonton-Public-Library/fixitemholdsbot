@@ -27,7 +27,7 @@
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Created: Thu Nov 19 14:26:00 MST 2015
 # Rev:
-#          0.9.00   - Added '-.
+#          0.9.00   - Added '-c' flag.
 #          0.8.00_e - Fixed ordering of usage flags.
 #          0.8.00_d - Forgot to activate -V.
 #          0.8.00_c - Updated usage notes.
