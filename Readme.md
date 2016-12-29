@@ -55,7 +55,7 @@ Example:
 ```
 
 ```
--a: Check entire hold table for holds with issues and report counts. The
+ -a: Check entire hold table for holds with issues and report counts. The
      hold selection is based on ACTIVE holds that point to non-existant
      items. This does not report all holds that point to lost or stolen
      or discarded items. That would simply take too long.
@@ -66,6 +66,12 @@ Example:
  -h<hold_key>: Input a specific hold key. This operation will look at all
      holds for the title that are placed on items that are currently in
      invalid locations like discard, missing, or stolen.
+ -H<hold_key_file>: Moves holds from a specific hold keys listed
+     in the argument file. See '-h' for similar operation. Hold keys
+     should appear as the first non-white space data on each line, in pipe-
+     delimited format. New lines are Unix style line endings. Example:
+     '2101992|'
+     '2101992|ocn2442309|Treasure Island|'
  -i<item_id_file>: Moves holds from a specific item keys listed
      in the argument file. See '-I' for similar operation. Item keys
      should appear as the first non-white space data on each line, in pipe-
@@ -75,7 +81,7 @@ Example:
  -I<item_barcode>: Moves holds from a specific item based on it's item ID if
      required, and if possible. This may not be possible if the only other items are in
      non-viable locations, or there is only one item on the title.
- -r: Prints TCNs and title of un-fixable holds to STDOUT.
+ -r: Prints TCNs and title of un-fixable holds to STDOUT. Each title reported uniquely.
  -t: Preserve temporary files in $TEMP_DIR.
  -U: Do the work, otherwise just print what would happen to STDERR.
  -v: Verbose output.
