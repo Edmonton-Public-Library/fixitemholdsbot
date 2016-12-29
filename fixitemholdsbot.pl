@@ -542,7 +542,8 @@ for my $key ( keys %$UNIQ_ITEM_KEY_REF )
 {
 	if ( $opt{'r'} )
 	{
-		printf `echo "$key" | selcatalog -iC -oFt 2>/dev/null`;
+		chomp( my $tcn_title = `echo "$key" | selcatalog -iC -oFt 2>/dev/null` );
+		printf "%s\n", $tcn_title if ( $tcn_title );
 	}
 	else
 	{
