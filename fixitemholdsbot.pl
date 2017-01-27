@@ -27,6 +27,7 @@
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Created: Thu Nov 19 14:26:00 MST 2016
 # Rev:
+#          0.10.02  - Add -f to force inclusion of a location as non-holdable.
 #          0.10.01  - Report each title only once.
 #          0.10.00  - Added -H to handle a file of hold keys.
 #          0.9.00   - Added '-c' flag.
@@ -73,7 +74,7 @@ use Getopt::Std;
 $ENV{'PATH'}  = qq{:/s/sirsi/Unicorn/Bincustom:/s/sirsi/Unicorn/Bin:/usr/bin:/usr/sbin};
 $ENV{'UPATH'} = qq{/s/sirsi/Unicorn/Config/upath};
 ###############################################
-my $VERSION            = qq{0.10.01};
+my $VERSION            = qq{0.10.02};
 chomp( my $TEMP_DIR    = `getpathname tmp` );
 chomp( my $TIME        = `date +%H%M%S` );
 chomp( my $DATE        = `date +%Y%m%d` );
@@ -92,7 +93,8 @@ sub usage()
 {
     print STDERR << "EOF";
 
-	usage: $0 [-a|-B<user_id>|-h<hold_key>|-H<hold_key_file>|-i<item_id_file>|-I<item_id>] {cdrtUvVx]
+	usage: $0 [-a|-B<user_id>|-h<hold_key>|-H<hold_key_file>|-i<item_id_file>|-I<item_id>] -[cdrtUvVx]
+	          [-f<non-hold-able_location>]
 Item database errors occur on accounts when the customer has a hold, who's
 hold key contains an item key that no longer exists. The script has
 different modes of operation. If '-a' switch is used, the entire hold table
@@ -143,6 +145,15 @@ Example:
  -c: Only consider moving holds to items that have the circulate flag set to 'Y'.
      Otherwise just consider items in hold-able locations.
  -d: Debug.
+ -f<LOCATION>: Force a location to be recognized by this script to be unholdable.
+     This will trigger the script to try and move these item holds to other
+     hold-able locations.
+     Normally this script checks policies for unhold-able location, but if you 
+     want to include a sytem-recognized-holdable location as un-hold-able, then 
+     include them with the -f flag.
+     Example: -f"ON-ORDER,REF-BOOK"
+     Now 'ON-ORDER', and 'REF-BOOK' will be considered un-hold-able in addition
+     to the already sytem-recognized-holdable locations.
  -h<hold_key>: Input a specific hold key. This operation will look at all
      holds for the title that are placed on items that are currently in
      invalid locations like discard, missing, or stolen.
@@ -177,6 +188,7 @@ example:
   $0 -i"item.keys.lst" -vrU
   $0 -I31221116214003 -vrUt
   $0 -I31221116214003 -vrUtc
+  $0 -I31221116214003 -vrUtc -fON-ORDER  # Consider ON-ORDER location as unholdable.
 Cancel the holds, listed by hold key, in the argument file. Report if you can't do it, actually do it
 if you can, and restrict to circulate-able items.
   $0 -H"hold.keys.lst" -rUc
@@ -374,7 +386,7 @@ sub report_or_fix_callseq_copyno( $$$ )
 # return:
 sub init
 {
-    my $opt_string = 'aB:cdh:H:i:I:rtUvVx';
+    my $opt_string = 'aB:cdf:h:H:i:I:rtUvVx';
     getopts( "$opt_string", \%opt ) or usage();
     usage() if ( $opt{'x'} );
 	# Dynamically populate the non-holdable locations from the system policies.
@@ -382,6 +394,14 @@ sub init
 	# Keep a copy in case someone asks to see what the script thinks is non-holdable.
 	create_tmp_file( "fixitemholdsbot_sel_nonhold_loc_", $results );
 	@INVALID_LOCATIONS = split '\n', $results;
+	if ( $opt{'f'} )
+	{
+		my @additional_non_holdable_locations = split ',', $opt{'f'};
+		foreach my $new_location ( @additional_non_holdable_locations )
+		{
+			push @INVALID_LOCATIONS, $new_location;
+		}
+	}
 }
 
 init();

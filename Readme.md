@@ -20,6 +20,13 @@ the following API.
 The script collects all the errors and parses the item keys before proceeding
 to fix these items.
 
+The script looks for holds on un-hold-able locations, which it takes from the
+policy file. What do you do if you want to shift holds from a location that is
+hold-able. You may want to delete a temporary item with a location of ON-ORDER.
+That's a hold-able location. To move it use the -f flag as below.
+
+ ```-f ON-ORDER,REF-BOOK```
+
 Another mode uses '-h' with a specific hold key. In this case the script
 will find all the holds that are sitting on items that are in problematic
 current locations. Once a hold on an invalid item has been identified, the
@@ -33,7 +40,7 @@ viable locations. See '-r' for more information.
 Another common request is to fix holds on an item based on the item id. This
 can be done with the '-I' flag.
 
-Finally the '-B' switch will analyse the holds for a specific use and move the
+The '-B' switch will analyse the holds for a specific use and move the
 holds that currently rest on non-viable items if possible. This may not be
 possible if the hold is on a title with only one item, or all the items on
 the title are non-viable (current locations are included in the list of
@@ -63,6 +70,15 @@ Example:
  -c: Only consider moving holds to items that have the circulate flag set to 'Y'.
      Otherwise just consider items in hold-able locations.
  -d: Debug.
+ -f<LOCATION>: Force a location to be recognized by this script to be unholdable.
+     This will trigger the script to try and move these item holds to other
+     hold-able locations.
+     Normally this script checks policies for unhold-able location, but if you 
+     want to include a sytem-recognized-holdable location as un-hold-able, then 
+     include them with the -f flag.
+     Example: -f"ON-ORDER,REF-BOOK"
+     Now 'ON-ORDER', and 'REF-BOOK' will be considered un-hold-able in addition
+     to the already sytem-recognized-holdable locations.
  -h<hold_key>: Input a specific hold key. This operation will look at all
      holds for the title that are placed on items that are currently in
      invalid locations like discard, missing, or stolen.
@@ -88,6 +104,7 @@ Example:
  -V: Enforce the restriction of holds to the same call number.
  -x: This (help) message.
 ```
+ON-ORDER is a valid hold-able location. Have to allow script to think of it otherwise while it is running. Working on testing change. Adding -f flag to allow ',' delimited non-hold-able locations.
  
 Repository Information:
 -----------------------
