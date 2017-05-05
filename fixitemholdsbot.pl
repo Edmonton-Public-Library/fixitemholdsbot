@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-###################################################################
+############################################################################################
 #
 # Perl source file for project deleteme
 # Purpose: Fix item database errors.
@@ -27,6 +27,7 @@
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Created: Thu Nov 19 14:26:00 MST 2016
 # Rev:
+#          0.11.00  - '-U' now runs cat keys identified to be fixed through fixholds (SD).
 #          0.10.02  - Add -f to force inclusion of a location as non-holdable.
 #          0.10.01  - Report each title only once.
 #          0.10.00  - Added -H to handle a file of hold keys.
@@ -51,9 +52,9 @@
 #          0.1.01 - Fix hold count error reporting.
 #          0.1 - Production.
 #          0.0 - Dev.
-# Dependencies: pipe.pl, selhold, selitem, getpathname, getpol.
+# Dependencies: pipe.pl, selhold, selitem, getpathname, getpol, fixholds.
 #
-###################################################################
+###############################################################################################
 
 use strict;
 use warnings;
@@ -74,7 +75,7 @@ use Getopt::Std;
 $ENV{'PATH'}  = qq{:/s/sirsi/Unicorn/Bincustom:/s/sirsi/Unicorn/Bin:/usr/bin:/usr/sbin};
 $ENV{'UPATH'} = qq{/s/sirsi/Unicorn/Config/upath};
 ###############################################
-my $VERSION            = qq{0.10.02};
+my $VERSION            = qq{0.11.00};
 chomp( my $TEMP_DIR    = `getpathname tmp` );
 chomp( my $TIME        = `date +%H%M%S` );
 chomp( my $DATE        = `date +%Y%m%d` );
@@ -85,6 +86,7 @@ my $CHANGED_HOLDS_LOG  = qq{changed_holds.log};
 # These are our invalid locations which are gathered for your site automatically with getpol.
 my @INVALID_LOCATIONS  = qw{};
 my $UNIQ_ITEM_KEY_REF  = {};
+my $CAT_KEYS_FIXCOUNTS = "$TEMP_DIR/sd_fixholds.keys";
 
 #
 # Message about this program and how to use it.
@@ -174,7 +176,8 @@ Example:
      non-viable locations, or there is only one item on the title.
  -r: Prints TCNs and title of un-fixable holds to STDOUT. Each title reported uniquely.
  -t: Preserve temporary files in $TEMP_DIR.
- -U: Do the work, otherwise just print what would happen to STDERR.
+ -U: Do the work, otherwise just print what would happen to STDERR. Runs SirsiDynix's
+     fixholds on the cat keys that were identified to be fixed.
  -v: Verbose output.
  -V: Enforce the restriction of holds to the same call number.
  -x: This (help) message.
@@ -240,6 +243,24 @@ sub create_tmp_file( $$ )
 	# Add it to the list of files to clean if required at the end.
 	push @CLEAN_UP_FILE_LIST, $master_file;
 	return $master_file;
+}
+
+# Writes the contents of an array to file. For efficency sake we write a whole array
+# at once. Otherwise an update is expensive when opening and closing the file.
+# param:  file name string - path of file to write to.
+# param:  table array reference - data to write to file (like: \@array_name).
+# return: the number of items written to file.
+sub writeTable( $$ )
+{
+	my $fileName = shift;
+	my $table    = shift;
+	open TABLE, ">$fileName" or die "Serialization error writing '$fileName' $!\n";
+	foreach my $value ( @$table )
+	{
+		print TABLE "$value\n";
+	}
+	close TABLE;
+	return scalar @$table;
 }
 
 # Returns the call number's analytical position which indicates the character position
@@ -514,6 +535,8 @@ if ( ! -s $item_keys )
 # We will use the locations to determine viable copies and then choose the
 # sequence number and copy number (if necessary) from a viable item with a reasonable location.
 open ITEM_KEYS, "<$item_keys" || die "** error opening '$item_keys', $!.\n";
+# Get an array ready for storing cat keys we need to fix.
+my @cat_keys_to_fix = ();
 while (<ITEM_KEYS>)
 {
 	chomp( my ( $catKey, $seqNumber, $copyNumber ) = split '\|', $_ );
@@ -540,6 +563,9 @@ while (<ITEM_KEYS>)
 					printf STDERR "Hold key: %s, item key '%s' should be changed to '%s|%s|%s|%s|'.\n", $holdKey, $itemKey, $viableItemKey, $viableSeqNumber, $viableCopyNumber, $viableLocation;
 					report_or_fix_callseq_copyno( $holdKey, $viableSeqNumber, $viableCopyNumber );
 				}
+				# record cat keys to fix and them to a single file and at the end, 
+				# with '-U' run them through fixholds.
+				push @cat_keys_to_fix, $catKey if ( $opt{'U'} );
 			}
 			else # Couldn't find the hold key with explicit use of cat key sequence number and copy number.
 			{
@@ -556,6 +582,13 @@ while (<ITEM_KEYS>)
 		# Output unique title information, that is, only report once per title problem.
 		$UNIQ_ITEM_KEY_REF->{ $itemKey } = 1;
 	}
+}
+# Fix any cat key counts if -U.
+if ( $opt{'U'} && scalar( @cat_keys_to_fix ) > 0 )
+{
+	my $count = writeTable( $CAT_KEYS_FIXCOUNTS, \@cat_keys_to_fix );
+	printf STDERR "%d titles' hold counts will be updated...\n", $count;
+	`cat "$CAT_KEYS_FIXCOUNTS" | fixholds -u 2>/dev/null`;
 }
 # Report what happened if necessary.
 for my $key ( keys %$UNIQ_ITEM_KEY_REF ) 
